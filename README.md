@@ -6,7 +6,6 @@
 
 Requirement-driven repository context for coding agents.
 
-*Anonymous research release*
 
 [Overview](#overview) · [Installation](#installation) · [Quick Start](#quick-start) · [Experiments](#reproducing-experiments) · [Repository Layout](#repository-layout)
 
