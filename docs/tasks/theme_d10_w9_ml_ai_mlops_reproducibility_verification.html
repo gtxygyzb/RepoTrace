@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ml-checkpoint-reproducibility-engine — EvoCode-Bench</title>
+<link rel="stylesheet" href="../assets/site.css">
+</head><body>
+<div class="wrap">
+  <header class="top">
+    <h1>ml-checkpoint-reproducibility-engine</h1>
+    <span class="crumb"><a href="../index.html">← all tasks</a></span>
+  </header>
+  <p class="sub">
+    <span class="pill hard">hard</span>
+    <span class="pill">ml reproducibility verification</span>
+    <span class="pill">8 rounds</span>
+    <span class="pill">theme_d10_w9_ml_ai_mlops_reproducibility_verification</span><br>
+    Build a command-line tool called `repro-verify` in Go that verifies the integrity and reproducibility of machine learning model checkpoints and experiment artifacts.
+  </p>
+
+  <div class='analysis'><p style='margin:0'><strong>DeepSeek-V4-Pro leads all 12 models at just 2/8 rounds, while GPT-5.5 posts the highest 99% case pass at 1/8 — a textbook case of the binary round reward burying real progress.</strong></p></div>
+
+  <h2>What the agent is asked, round by round</h2>
+  <p class="sub" style="margin-top:0">Each round adds new requirements to the same workspace. Click a round to read the exact task the agent was given.</p>
+  <div id="rounds"></div>
+
+  <h2>Per-round test-case results</h2>
+  <div class="keybox">
+    <b>How to read the grid.</b> Every round ships an executable test suite. A cell like <b>43</b>/45&nbsp;<span class="xf">2✗</span>
+    means the model passed <b>43 of the round's 45 test cases</b> and <b>2 failed</b>. The round earns a reward of
+    <b>1 only if every case passes</b> — so a model can pass 43/45 and still score 0 for that round. The case counts
+    show the partial progress the 0/1 round score hides. Cell <b>color = how many cases failed</b> (green = 0).
+    A <b>build&nbsp;✗</b> cell means the model's code did not compile, so the tests could not run (a real 0 — the
+    reference solution builds fine). <b>n/a</b> means that run never reached this round. <b>Click any cell</b> for details below.
+  </div>
+  <div id="heatmap"></div>
+  <div class="legend">cases failed in the cell:
+    <i style="background:#2fae5f"></i>0<i style="background:#8ec74e"></i>1-2<i style="background:#d6c34a"></i>3-5
+    <i style="background:#e89a3c"></i>6-10<i style="background:#e3692f"></i>11-20<i style="background:#d23b34"></i>20+
+    <i style="background:#3a2730"></i>code didn't build<i style="background:#22272f"></i>round not run (n/a)</div>
+  <div id="detail"><span class="ph">Click a cell above to see the round's task and that model's failed requirements.</span></div>
+
+  <h2>Difficulty analysis</h2>
+  <div class='analysis'><p>This task builds <strong>repro-verify</strong>, a Go CLI that verifies the integrity and reproducibility of ML checkpoints and experiment artifacts: parse TOML manifests, audit lineage, compare outputs, detect drift, and emit reports across 8 rounds. All 12 models run the full chain (no aborts), so it reads as a clean capability probe — but the all-or-nothing round reward means a single missed assertion zeroes the round, and no model clears more than 2 of 8.</p><p>The load-bearing requirements, failed by most of the field, are <span class='req'>report.lineage-detail</span> (12/12 models — <em>"assertion failed"</em> on a report that should exit 0) and <span class='req'>lineage.equal-timestamps</span> (12/12), the lineage-reconstruction edge cases. Close behind are <span class='req'>report.comparison-missing</span> (9 models), <span class='req'>generate-report</span> and <span class='req'>toml.inline-comments</span> (8 models each), and <span class='req'>audit-lineage.unresolved-parent</span> (7 models) — the precise output-formatting and parsing contracts that separate a working tool from a correct one.</p></div>
+
+  <h2>Per-model failures (whole task)</h2>
+  <p class="sub" style="margin-top:0">Click a model to expand every requirement it failed across all rounds, with a representative reason from the verifier.</p>
+  <div id="breakdown"></div>
+
+  <h2>Performance gap</h2>
+  <div class='analysis'><p>The sole round leader is <strong>DeepSeek-V4-Pro at 2/8 rounds</strong> (98% case pass), clearing more of the lineage and comparison stages than anyone else. <strong>Opus-4.8 and GPT-5.5 each reach 1/8 rounds</strong> at 98% and 99% case pass respectively — near-complete tools that still stumble on the universal blockers <span class='req'>report.lineage-detail</span> and <span class='req'>lineage.equal-timestamps</span>.</p><p>The remaining nine models all post <strong>0/8 rounds</strong>, but the case-level view fractures them sharply. <strong>MiniMax-M3 leads the zero-round group at 93%</strong>, followed by DeepSeek-V4-Flash (92%) and Qwen3.6-Plus (90%) — essentially complete implementations derailed only by the strictest assertion checks. At the other extreme, Kimi-K2.7-Code collapses to 0% and GLM-5.2 to 30%, with GLM-5.1 (40%) and Qwen3.7-Max (57%) also struggling broadly. The round column flattens a 0%-to-99% capability range into a wall of zeros for all but one model.</p></div>
+
+  <h2>Is the task fair? (top-model check)</h2>
+  <div class='analysis'><p>Opus-4.8 cleared round 1 at full marks then stalled at round 2 (<em>"The TOML parsing is fragile"</em>), passing 145/151 cases; the 6 failing cases all belong to well-specified error-handling contracts: <span class='req'>json-errors.usage</span> (expected exit 1), <span class='req'>json-errors.toplevel</span> (expected structured error JSON on stdout), and <span class='req'>json-errors.unreadable</span> (expected exit 1) — concrete, unambiguous assertions that the oracle satisfies every round. These are genuine implementation gaps by a top-tier model, not grading artifacts, confirming that the harder rounds reflect real capability headroom rather than any defect in the task or test suite.</p></div>
+
+  <p class="foot">Test-case data extracted from the verifier <code>CASE_RESULT</code> logs of each model's run.
+    Reasons are the verifier's own <code>failure_reason</code> (back-filled from expected/actual when terse).</p>
+</div>
+
+<script src="../assets/site.js"></script>
+<script>
+fetch("../data/tasks/theme_d10_w9_ml_ai_mlops_reproducibility_verification.json").then(function(r){return r.json();}).then(function(T){
+  window.__MODELS__ = Object.keys(T.models);
+  var detail = document.getElementById("detail");
+  EvoViz.renderRounds(document.getElementById("rounds"), T);
+  EvoViz.renderHeatmap(document.getElementById("heatmap"), T, function(model, round){
+    EvoViz.renderDetail(detail, T, model, round);
+    detail.scrollIntoView({behavior:"smooth", block:"nearest"});
+  });
+  EvoViz.renderBreakdown(document.getElementById("breakdown"), T);
+});
+</script>
+</body></html>

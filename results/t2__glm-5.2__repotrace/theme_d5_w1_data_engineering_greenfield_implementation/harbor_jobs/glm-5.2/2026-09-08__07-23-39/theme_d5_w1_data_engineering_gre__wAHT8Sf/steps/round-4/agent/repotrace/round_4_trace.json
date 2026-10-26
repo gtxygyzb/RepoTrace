@@ -1,0 +1,58 @@
+{
+ "round": 4,
+ "root": "/app",
+ "graph": {
+  "n_files": 1,
+  "n_edges": 0,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "main.go",
+    "pagerank": 1.0,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "main.go"
+  ],
+  "target_symbols": [
+   "ingest",
+   "parseEvent",
+   "loadRates",
+   "loadRateMap",
+   "rate",
+   "usageError",
+   "newContext",
+   "readInputEvents"
+  ],
+  "behavior_constraints": [
+   "`fx_lookup` audit-log reason code is retired; replaced by `fx_unknown_currency` (currency not a key in any day's rates map) and `fx_no_rate_for_date` (currency known but no entry for the event's date-day).",
+   "Precedence slot 9 is split into 9a fx_unknown_currency, 9b fx_no_rate_for_date, 9c fx_bad_rate; slots 1-8 (schema_version, missing_id, missing_ts/bad_ts, missing_type/bad_type, missing_user, missing_amount/bad_amount, missing_currency/bad_currency, missing_ref_id) remain unchanged and win over any FX code.",
+   "New valueless flag `--rates-strict` (default off). Passing a value (e.g. `--rates-strict=foo`) is a usage error: exit 2 with existing usage-error string.",
+   "Without `--rates-strict`: a known currency with a rate entry for the date-day whose value is unusable (NaN, +Inf, -Inf, 0 including -0, or any negative finite number) is REJECTED with reason `fx_no_rate_for_date`.",
+   "With `--rates-strict`: the same unusable-rate case is REJECTED with reason `fx_bad_rate` instead; all other FX outcomes unchanged. `fx_bad_rate` is emitted ONLY under `--rates-strict`.",
+   "`--rates-strict` never changes `--output`, `--rejects`, or `--state-out` bytes; only audit-log `reason` field and (transitively) audit digest `invalid_reasons` histogram and `sha256` differ between modes.",
+   "On empty input directory or when no event reaches the FX-lookup step, `--rates-strict` is a pure no-op across all four output streams.",
+   "New optional integer flag `--rates-max-staleness` (seconds, default 0 = off). Negative value is a usage error (exit 2).",
+   "When `--rates-max-staleness` N > 0 and the exact-day rate is missing for a known currency, scan every day where the currency has a rate entry to find a fallback (exact-day rate still preferred when present; fx_fallback_days = 0 then).",
+   "When N == 0 and exact-day rate missing, event is rejected with `fx_no_rate_for_date` (unchanged strict-rates default)."
+  ],
+  "affected_prior": [
+   "ingest audit-log classification (round 3)",
+   "FX lookup / rate resolution logic in loadRates/rate/loadRateMap (round 1)",
+   "audit digest invalid_reasons histogram (round 3)",
+   "ingest flag parsing (round 1/2/3)"
+  ],
+  "summary": "This round retires the coarse `fx_lookup` audit reason by splitting it into `fx_unknown_currency` and `fx_no_rate_for_date`, adds a valueless `--rates-strict` flag that emits `fx_bad_rate` for unusable rate entries, and adds `--rates-max-staleness` to enable cross-day fallback rate resolution, while keeping all non-audit output streams byte-identical to prior rounds."
+ },
+ "instruction_head": "## Strict Rates and FX Reason Corrections\n\nThe audit log currently classifies FX-lookup failures under a single reason\ncode, `fx_lookup`. That is too coarse: two operationally different failure\nmodes (unknown currency vs. missing rate entry for a specific date-day) are\nlumped together. Split `fx_lookup` into two distinct codes, add an optional\n`--rates-strict` flag that additionally distinguishes unusable rate entries,\nand extend the audit artifacts with fallback/digest metadata described below."
+}

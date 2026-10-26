@@ -1,0 +1,94 @@
+{
+ "round": 2,
+ "root": "/app",
+ "graph": {
+  "n_files": 4,
+  "n_edges": 4,
+  "delta": {
+   "files_added": [
+    "cmd/jobforge/cycle.go",
+    "cmd/jobforge/run.go",
+    "cmd/jobforge/spec.go"
+   ],
+   "files_removed": [],
+   "edges_added": [
+    [
+     "cmd/jobforge/main.go",
+     "cmd/jobforge/run.go"
+    ],
+    [
+     "cmd/jobforge/main.go",
+     "cmd/jobforge/spec.go"
+    ],
+    [
+     "cmd/jobforge/run.go",
+     "cmd/jobforge/spec.go"
+    ],
+    [
+     "cmd/jobforge/spec.go",
+     "cmd/jobforge/cycle.go"
+    ]
+   ],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "cmd/jobforge/cycle.go",
+    "pagerank": 0.390362,
+    "fan_in": 1,
+    "fan_out": 0
+   },
+   {
+    "file": "cmd/jobforge/spec.go",
+    "pagerank": 0.317542,
+    "fan_in": 2,
+    "fan_out": 1
+   },
+   {
+    "file": "cmd/jobforge/run.go",
+    "pagerank": 0.171644,
+    "fan_in": 1,
+    "fan_out": 1
+   },
+   {
+    "file": "cmd/jobforge/main.go",
+    "pagerank": 0.120452,
+    "fan_in": 0,
+    "fan_out": 2
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "cmd/jobforge/main.go"
+  ],
+  "target_symbols": [
+   "main",
+   "runValidate",
+   "runList",
+   "formatListText",
+   "formatListJSON",
+   "applyOnlyFilter"
+  ],
+  "behavior_constraints": [
+   "Add read-only validate and list subcommands invoked as `jobforge validate --spec <path>` and `jobforge list --spec <path> [--format json|text] [--only <names>]`.",
+   "validate and list must use the same spec validation function/path as plan and run; invalid specs are classified identically across all subcommands.",
+   "validate on a valid spec exits 0 and writes zero bytes to stdout and zero bytes to stderr.",
+   "validate on an invalid spec exits 2, writes nothing to stdout, and writes exactly one stderr line `error: <code>: <message>` followed by a newline, with code/message/precedence identical to existing validation.",
+   "validate accepts only --spec; any other flag or bare positional argument exits 2 with a non-empty stderr line starting with `error: ` and no stdout.",
+   "list validates the spec first; on invalid spec it exits 2 with stderr-only error and empty stdout, never emitting the --only unknown_dep error before validation.",
+   "list never executes job commands and never reads/writes/consults a working directory on disk.",
+   "list emits jobs in deterministic walk order: ascending level, then byte-wise lexicographic case-sensitive within a level, matching plan/run.",
+   "list --format text default: one line per job ending with a newline, exactly `<name>\\tlevel=<N>\\tworkdir=<workdir>\\tdeps=<deps>\\tenv=<env>` using literal tab characters.",
+   "list level N starts at 0 and equals the job's level in the full spec; workdir is the resolved workdir with default /app applied when omitted."
+  ],
+  "affected_prior": [
+   "main CLI dispatch and argument parsing in cmd/jobforge/main.go",
+   "runPlan and runRun subcommand handlers",
+   "shared validation pipeline: loadSpec, detectCycle, findCyclePath, computeLevels, printValidationError, and existing error codes"
+  ],
+  "summary": "Add read-only validate and list subcommands that reuse the existing validation pipeline and emit strict deterministic spec diagnostics/listings with an --only transitive-dependency filter, without changing plan/run."
+ },
+ "instruction_head": "# jobforge validate and list\n\nAdd two new read-only subcommands: `validate` and `list`. Execution\nsemantics for the existing `plan` and `run` commands are unchanged. The\nbinary is still built with\n`go build -o /usr/local/bin/jobforge ./cmd/jobforge` and invoked as\n`jobforge <subcommand> --spec <path>`.\n\nExisting behavior \u2014 including the validation precedence table, byte-level\nresults file format, globally-lex-smallest multi-SCC cycle path, and\ncase-sensitive byte-wise within-level ordering \u2014 mus"
+}

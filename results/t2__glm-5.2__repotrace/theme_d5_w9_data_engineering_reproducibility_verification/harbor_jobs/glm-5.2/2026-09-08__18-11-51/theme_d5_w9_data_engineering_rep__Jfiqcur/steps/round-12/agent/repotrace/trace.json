@@ -1,0 +1,1290 @@
+[
+ {
+  "round": 1,
+  "root": "/app",
+  "graph": {
+   "n_files": 0,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": []
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go",
+    "cmd/ingest.go",
+    "cmd/transform.go",
+    "schema.go",
+    "recipe.go",
+    "expr.go",
+    "csvio.go",
+    "go.mod"
+   ],
+   "target_symbols": [
+    "main",
+    "runIngest",
+    "runTransform",
+    "Schema",
+    "ColumnSpec",
+    "validateRow",
+    "checkRequiredAndType",
+    "checkRange",
+    "checkPattern",
+    "checkUniqueness",
+    "sortByPrimaryKey",
+    "computeFileSHA256",
+    "Recipe",
+    "applyFilter",
+    "applyDerive",
+    "applySample",
+    "applySort",
+    "applyRename",
+    "applyDrop",
+    "applyAggregate"
+   ],
+   "behavior_constraints": [
+    "Tool is a Go CLI named dpipe with subcommands ingest and transform.",
+    "Outputs are bit-identical across repeated runs given identical input and configuration.",
+    "ingest reads a headered CSV and validates each row against a JSON schema.",
+    "Supported column types: int, float, string, datetime (RFC 3339).",
+    "Validation per-row order: required/type, then range, then pattern.",
+    "Uniqueness checked across all valid rows in input file order; later duplicate rejected with reason 'duplicate value for unique column: <name>'.",
+    "Range violations rejected with reason 'value out of range for column <name>: <value>'.",
+    "Pattern violations rejected with reason 'value does not match pattern for column <name>: <value>'.",
+    "Valid rows written to <output> CSV, sorted by primary_key columns in declaration order using each column's declared type ordering (ascending).",
+    "Rejected rows written to <output>.rejected with appended 'rejection_reason' column."
+   ],
+   "affected_prior": [],
+   "summary": "Build a deterministic Go CLI `dpipe` from scratch with ingest (CSV\u2192JSON-schema validation\u2192sorted valid output + rejected rows + SHA-256) and transform (recipe-driven operations including filter, derive with a full expression evaluator, deterministic sample, sort, rename, drop, aggregate, join, window, pivot, unpivot, fill) producing bit-identical outputs."
+  },
+  "instruction_head": "Build a deterministic data pipeline tool in Go called `dpipe`. The tool operates as a CLI that reads structured data from CSV files, applies a chain of transformations, and writes results to output files \u2014 with every step producing bit-identical output across repeated runs given the same input and configuration.\n\n## Core behaviors\n\n### Ingestion\n\n`dpipe ingest --input <path> --schema <path> --output <path>`\n\n- Reads a CSV file at `<path>`. The first row is a header.\n- Validates every row against"
+ },
+ {
+  "round": 2,
+  "root": "/app",
+  "graph": {
+   "n_files": 3,
+   "n_edges": 1,
+   "delta": {
+    "files_added": [
+     "csvio.go",
+     "expr.go",
+     "schema.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "schema.go",
+      "csvio.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "csvio.go",
+     "pagerank": 0.480519,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "expr.go",
+     "pagerank": 0.25974,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "schema.go",
+     "pagerank": 0.25974,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/profile.go",
+    "main.go",
+    "recipe.go",
+    "csvio.go",
+    "schema.go"
+   ],
+   "target_symbols": [
+    "runProfile",
+    "inferColumnType",
+    "computeColumnStats",
+    "computePercentile",
+    "computeCorrelations",
+    "applyDeduplicate",
+    "applySplit"
+   ],
+   "behavior_constraints": [
+    "profile command reads CSV (first row header), infers types, writes JSON statistical profile to output path with 2-space indentation and trailing newline",
+    "type inference order: int (ParseInt base10 bitsize64) \u2192 float (ParseFloat bitsize64) \u2192 datetime (RFC3339) \u2192 string; zero non-empty values \u2192 string",
+    "int and float columns include: count, null_count, unique, min, max, mean, stddev (population, sqrt(sum((xi-mean)^2)/n), 0 for single value), median, p25, p75",
+    "percentile: idx = p/100*(n-1); integer idx \u2192 values[idx]; else interpolate lower=floor(idx), upper=ceil(idx), frac=idx-lower, result=values[lower]+frac*(values[upper]-values[lower])",
+    "skewness: adjusted Fisher-Pearson with sample stddev (n-1); null if n<3 or s==0",
+    "kurtosis: sample excess kurtosis; null if n<4 or s==0",
+    "mode: most frequent value, smallest wins ties, null if all unique or count==0; int\u2192integer, float\u2192number",
+    "histogram: 10 equal-width bins, bins 0-8 [low,high), bin 9 [low,max]; identical values \u2192 single bin; empty count \u2192 []",
+    "string columns include: min_length, max_length (0 if count 0), most_common (top 5 by count desc, ties value asc), avg_length (0 if count 0)",
+    "datetime columns include: earliest and latest as RFC 3339 strings"
+   ],
+   "affected_prior": [
+    "main.go",
+    "cmd/transform.go",
+    "recipe.go",
+    "schema.go"
+   ],
+   "summary": "Add a profile command that infers column types and computes comprehensive statistics with a correlation matrix, plus deduplicate and split transforms."
+  },
+  "instruction_head": "Add the following capabilities to `dpipe`.\n\n## New command: `profile`\n\n`dpipe profile --input <path> --output <path>`\n\nReads a CSV file (first row is header), infers column types from data, and writes a JSON statistical profile to the output path.\n\n### Type inference\n\nSince `profile` operates without a schema, column types are inferred from non-empty values:\n\n1. If **all** non-empty values parse as integers (Go's `strconv.ParseInt` with base 10, bit size 64): type is `int`.\n2. Else if all non-em"
+ },
+ {
+  "round": 3,
+  "root": "/app",
+  "graph": {
+   "n_files": 9,
+   "n_edges": 14,
+   "delta": {
+    "files_added": [
+     "compare.go",
+     "jsonutil.go",
+     "main.go",
+     "pipeline.go",
+     "profile.go",
+     "stats.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "compare.go",
+      "csvio.go"
+     ],
+     [
+      "compare.go",
+      "jsonutil.go"
+     ],
+     [
+      "jsonutil.go",
+      "csvio.go"
+     ],
+     [
+      "main.go",
+      "compare.go"
+     ],
+     [
+      "main.go",
+      "csvio.go"
+     ],
+     [
+      "main.go",
+      "pipeline.go"
+     ],
+     [
+      "main.go",
+      "profile.go"
+     ],
+     [
+      "pipeline.go",
+      "compare.go"
+     ],
+     [
+      "pipeline.go",
+      "csvio.go"
+     ],
+     [
+      "pipeline.go",
+      "profile.go"
+     ],
+     [
+      "profile.go",
+      "csvio.go"
+     ],
+     [
+      "profile.go",
+      "jsonutil.go"
+     ],
+     [
+      "profile.go",
+      "stats.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "csvio.go",
+     "pagerank": 0.327611,
+     "fan_in": 6,
+     "fan_out": 0
+    },
+    {
+     "file": "jsonutil.go",
+     "pagerank": 0.130064,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "compare.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 2
+    },
+    {
+     "file": "profile.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 3
+    },
+    {
+     "file": "stats.go",
+     "pagerank": 0.089148,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "pipeline.go",
+     "pagerank": 0.075018,
+     "fan_in": 1,
+     "fan_out": 3
+    },
+    {
+     "file": "expr.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 4
+    },
+    {
+     "file": "schema.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "pipeline.go",
+    "profile.go",
+    "main.go",
+    "drift.go"
+   ],
+   "target_symbols": [
+    "main",
+    "cmdDrift",
+    "runDrift",
+    "buildProfile",
+    "inferProfileType",
+    "addNumericProfile",
+    "buildColumnProfile",
+    "runPipeline",
+    "recipeResample",
+    "detectDrift",
+    "buildDriftProfile"
+   ],
+   "behavior_constraints": [
+    "fill linear: empty cells with only a lower anchor use the lower anchor value; only an upper anchor use the upper anchor value; both anchors interpolate as v_lo + (v_hi - v_lo)*(i - lo)/(hi - lo); neither anchor leaves the cell empty.",
+    "normalize zscore uses sample standard deviation (denominator n-1); if n<2 or stddev==0, all output values are \"0\".",
+    "Numeric profile columns (int/float) include p05 and p95 computed with idx = p/100*(n-1) and linear interpolation between sorted neighbors.",
+    "drift command builds internal column profiles for baseline and current CSVs and detects schema drifts (column_added, column_removed, type_changed) for all columns and distribution drifts (mean_shift, null_rate_change, range_expansion, unique_ratio_change) for numeric columns present in both with same type and count>0.",
+    "Drift distribution formulas: mean_shift if |cur_mean - base_mean| / max(base_stddev, 1e-10) > threshold; null_rate_change if |null_rate diff| > threshold (null_rate = null_count/row_count, 0 if row_count 0); range_expansion if (cur_max - cur_min) > (base_max - base_min)*(1+threshold); unique_ratio_change if |unique_ratio diff| > threshold (unique_ratio = unique/count, 0 if count 0).",
+    "drift --threshold defaults to 0.1.",
+    "Drift output is JSON with 2-space indentation and trailing newline, containing drifts array and summary with total_drifts, schema_drifts, distribution_drifts.",
+    "Each drift entry has column, drift_type, baseline_value, current_value, and detail formatted exactly as specified.",
+    "Drifts sorted by column name ascending, then drift_type order: column_added, column_removed, type_changed, mean_shift, null_rate_change, range_expansion, unique_ratio_change.",
+    "Drift error handling: missing baseline/current prints ERROR: file not found: <path> exit 1; unparseable CSV prints ERROR: cannot parse CSV: <path> exit 1."
+   ],
+   "affected_prior": [
+    "fill transform linear strategy behavior",
+    "normalize transform zscore method",
+    "profile numeric column output (addNumericProfile, buildColumnProfile)",
+    "runPipeline transform dispatch and recipe handling",
+    "main command dispatch"
+   ],
+   "summary": "Corrects fill-linear extrapolation and zscore sample stddev, adds p05/p95 to profiles, introduces a drift command for schema/distribution drift detection, and adds a resample transform."
+  },
+  "instruction_head": "Add the following capabilities to `dpipe` and apply the specified behavior corrections.\n\n## Behavior Corrections\n\n### Fill linear: boundary extrapolation\n\nThe `fill` transform with `\"strategy\": \"linear\"` now handles boundary cells differently:\n\n- If only a **lower anchor** exists (no float-parseable non-empty cell found below the current empty cell), the empty cell is filled with the lower anchor's value.\n- If only an **upper anchor** exists (no float-parseable non-empty cell found above the cur"
+ },
+ {
+  "round": 4,
+  "root": "/app",
+  "graph": {
+   "n_files": 9,
+   "n_edges": 14,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "csvio.go",
+     "pagerank": 0.327611,
+     "fan_in": 6,
+     "fan_out": 0
+    },
+    {
+     "file": "jsonutil.go",
+     "pagerank": 0.130064,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "compare.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 2
+    },
+    {
+     "file": "profile.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 3
+    },
+    {
+     "file": "stats.go",
+     "pagerank": 0.089148,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "pipeline.go",
+     "pagerank": 0.075018,
+     "fan_in": 1,
+     "fan_out": 3
+    },
+    {
+     "file": "expr.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 4
+    },
+    {
+     "file": "schema.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go",
+    "validate.go",
+    "pipeline.go",
+    "schema.go"
+   ],
+   "target_symbols": [
+    "main",
+    "cmdValidate",
+    "runValidate",
+    "Violation",
+    "ValidationReport",
+    "LoadSchema",
+    "ColumnSpec",
+    "validateRow",
+    "runPipeline",
+    "crossjoin",
+    "checkpoint",
+    "rowHash",
+    "validateStep"
+   ],
+   "behavior_constraints": [
+    "dpipe validate --input <path> --schema <path> --output <path> reads CSV and JSON schema and writes 2-space indented JSON with a trailing newline.",
+    "Schema columns map supports type int/float/string, required, min, max, pattern, unique, enum, and top-level strict.",
+    "Non-empty values must parse with strconv.ParseInt for int and strconv.ParseFloat for float; empty values violate only when required is true.",
+    "Min/max are checked only after type check passes; pattern applies to string type only; enum compares raw CSV string; unique flags duplicate non-empty values per column.",
+    "Schema columns missing from CSV produce one column_missing violation each; strict CSV columns not in schema produce one strict violation each.",
+    "Violation object has column, row (int or null), rule, value (string or null), message; row is null for unique/column_missing/strict and value is null for required/column_missing/strict.",
+    "Messages are exactly: type=expected <type>, got \"<value>\"; required=value is required; min=value <value> is below minimum <min>; max=value <value> exceeds maximum <max>; pattern=value \"<value>\" does not match pattern <pattern>; enum=value \"<value>\" is not in allowed values [<values joined with comma and space>]; unique=duplicate value \"<value>\" (first at row <N>, repeated at row <M>); column_missing=column \"<name>\" defined in schema but missing from data; strict=column \"<name>\" not defined in schema.",
+    "Violation ordering: CSV header order for present columns, then column_missing in schema key order, then strict in header order; within a column: type, required, min, max, pattern, enum, unique; within same column+rule row ascending with null after numbered rows.",
+    "Summary contains total_violations, columns_checked (schema columns present in CSV), and rows_checked (data row count); valid is true iff total_violations is 0.",
+    "Missing input or schema file exits 1 with ERROR: file not found: <path>; invalid JSON schema exits 1 with ERROR: invalid schema: <path>."
+   ],
+   "affected_prior": [
+    "main.go command dispatch and error handling (main, fail, cmd* functions)",
+    "pipeline.go runPipeline transform and step dispatch",
+    "schema.go LoadSchema/validateRow/ValidateRows validation behavior if reused or extended for detailed violations"
+   ],
+   "summary": "Add a standalone validate command, crossjoin and checkpoint transforms, and a pipeline validate step that emit detailed schema violation reports."
+  },
+  "instruction_head": "Add the following capabilities to `dpipe`.\n\n## New command: `validate`\n\n`dpipe validate --input <path> --schema <path> --output <path>`\n\nValidates a CSV data file against a JSON schema definition and reports all violations.\n\n### Schema format\n\n```json\n{\n  \"columns\": {\n    \"age\": {\"type\": \"int\", \"min\": 0, \"max\": 150, \"required\": true},\n    \"email\": {\"type\": \"string\", \"pattern\": \"^[^@]+@[^@]+$\", \"unique\": true},\n    \"status\": {\"type\": \"string\", \"enum\": [\"active\", \"inactive\"]}\n  },\n  \"strict\": fals"
+ },
+ {
+  "round": 5,
+  "root": "/app",
+  "graph": {
+   "n_files": 9,
+   "n_edges": 14,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "csvio.go",
+     "pagerank": 0.327611,
+     "fan_in": 6,
+     "fan_out": 0
+    },
+    {
+     "file": "jsonutil.go",
+     "pagerank": 0.130064,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "compare.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 2
+    },
+    {
+     "file": "profile.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 3
+    },
+    {
+     "file": "stats.go",
+     "pagerank": 0.089148,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "pipeline.go",
+     "pagerank": 0.075018,
+     "fan_in": 1,
+     "fan_out": 3
+    },
+    {
+     "file": "expr.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 4
+    },
+    {
+     "file": "schema.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go",
+    "csvio.go",
+    "pipeline.go",
+    "lineage.go"
+   ],
+   "target_symbols": [
+    "main",
+    "ComputeFileHash",
+    "WriteCSVWithChecksum",
+    "runPipeline",
+    "cmdLineage",
+    "runLineage",
+    "cmdVerify",
+    "cmdManifest",
+    "runIngest",
+    "runTransform"
+   ],
+   "behavior_constraints": [
+    "verify command validates file against BLAKE2b-256 hex digest (64 lowercase hex chars) read from --checksum file",
+    "manifest command produces BLAKE2b-256 checksums instead of SHA256",
+    "ingest command no longer writes <output>.sha256 sidecar files and removes any pre-existing <output>.sha256",
+    "transform command no longer writes <output>.sha256 sidecar files and removes any pre-existing <output>.sha256",
+    "lineage command reads pipeline config and emits a DAG JSON report without executing the pipeline",
+    "lineage report contains nodes (sorted by id lexicographically), edges (sorted by step then from), and steps (sorted by index)",
+    "each node has id, type='file', produced_by (1-based step index or null)",
+    "each edge has from, to, step (1-based); steps with no output produce no edges",
+    "each step has index, type, inputs array, output (string or null)",
+    "lineage step-type mapping: ingest(file->output), transform(input+recipe->output), profile(input->output), compare(left+right->output), manifest(dir->output), verify(file+checksum, no output), validate(input+schema->output), drift(baseline+current->output)"
+   ],
+   "affected_prior": [
+    "ComputeFileHash/WriteCSVWithChecksum in csvio.go (SHA256->BLAKE2b-256)",
+    "ingest command from round 1 (sidecar removal)",
+    "transform command from round 1 (sidecar removal)",
+    "manifest command (checksum algorithm)",
+    "verify command (checksum algorithm)",
+    "pipeline command from round 1 (new step type)"
+   ],
+   "summary": "Switch checksum hashing from SHA256 to BLAKE2b-256 across manifest/verify while removing sidecar hash files from ingest/transform, and add a new lineage command (plus pipeline lineage step) that emits a file-dependency DAG JSON report."
+  },
+  "instruction_head": "Add the following capabilities to `dpipe` and apply the specified behavior change.\n\n## Behavior Change: verify command checksum algorithm\n\nThe `verify` command previously used SHA256 for computing file checksums. It now uses **BLAKE2b-256** instead.\n\n- The `verify` command still reads the checksum file passed with `--checksum` and compares it against the digest of the file passed with `--file`.\n- Checksums in manifest files must now be BLAKE2b-256 hex digests (64 lowercase hex characters).\n- The"
+ },
+ {
+  "round": 6,
+  "root": "/app",
+  "graph": {
+   "n_files": 9,
+   "n_edges": 14,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "csvio.go",
+     "pagerank": 0.327611,
+     "fan_in": 6,
+     "fan_out": 0
+    },
+    {
+     "file": "jsonutil.go",
+     "pagerank": 0.130064,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "compare.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 2
+    },
+    {
+     "file": "profile.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 3
+    },
+    {
+     "file": "stats.go",
+     "pagerank": 0.089148,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "pipeline.go",
+     "pagerank": 0.075018,
+     "fan_in": 1,
+     "fan_out": 3
+    },
+    {
+     "file": "expr.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 4
+    },
+    {
+     "file": "schema.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go",
+    "pipeline.go",
+    "stats.go",
+    "profile.go",
+    "audit.go"
+   ],
+   "target_symbols": [
+    "main",
+    "cmdProfile",
+    "cmdCompare",
+    "cmdPipeline",
+    "runPipeline",
+    "recipeFloat",
+    "recipeString",
+    "recipeInt",
+    "recipeBool",
+    "recipeStringList",
+    "meanFloat64s",
+    "percentileSorted",
+    "modeFloat",
+    "formatFloat",
+    "appendAuditEntry",
+    "AuditEntry",
+    "recipeImpute"
+   ],
+   "behavior_constraints": [
+    "Any dpipe command accepts an optional global --audit <path> flag.",
+    "After command completion (success or error), an audit entry is appended to the JSON audit log at the given path.",
+    "Audit log file is a JSON array; created with single-element array if missing.",
+    "If existing file is a valid JSON array, append new entry and rewrite.",
+    "If existing file is not a valid JSON array, overwrite with single-element array containing just the new entry.",
+    "Audit log is 2-space indented JSON array with trailing newline.",
+    "Each audit entry has fields: command, args, timestamp, duration_ms, success, error, input_size, output_size.",
+    "args excludes the command name and the --audit flag and its value.",
+    "timestamp is UTC ISO 8601 formatted as 2006-01-02T15:04:05Z.",
+    "duration_ms is integer milliseconds of execution duration."
+   ],
+   "affected_prior": [
+    "main.go command dispatch",
+    "pipeline.go recipe handling",
+    "runPipeline",
+    "cmd* command functions",
+    "profile.go mode helpers",
+    "stats.go percentile/mean helpers"
+   ],
+   "summary": "This round adds a global --audit flag that records per-command execution metadata to a JSON audit log, plus a new impute transform that fills empty cells using mean/median/mode statistics."
+  },
+  "instruction_head": "Add the following capabilities to `dpipe`.\n\n## New global flag: `--audit`\n\nAny `dpipe` command can accept an optional `--audit <path>` flag. When present, after the command completes (successfully or with error), an execution metadata entry is appended to a JSON audit log file at the given path.\n\n### Audit log format\n\nThe audit log file is a JSON array of entry objects. If the file does not exist, create it with a single-element array. If the file exists and contains a valid JSON array, append t"
+ },
+ {
+  "round": 7,
+  "root": "/app",
+  "graph": {
+   "n_files": 9,
+   "n_edges": 14,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "csvio.go",
+     "pagerank": 0.327611,
+     "fan_in": 6,
+     "fan_out": 0
+    },
+    {
+     "file": "jsonutil.go",
+     "pagerank": 0.130064,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "compare.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 2
+    },
+    {
+     "file": "profile.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 3
+    },
+    {
+     "file": "stats.go",
+     "pagerank": 0.089148,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "pipeline.go",
+     "pagerank": 0.075018,
+     "fan_in": 1,
+     "fan_out": 3
+    },
+    {
+     "file": "expr.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 4
+    },
+    {
+     "file": "schema.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go",
+    "pipeline.go"
+   ],
+   "target_symbols": [
+    "cmdLineage",
+    "runPipeline"
+   ],
+   "behavior_constraints": [
+    "Lineage manifest step produces an empty inputs array [] and creates no edges",
+    "Lineage manifest step still emits its output field as a node produced_by the step",
+    "Lineage manifest step dir value is not included as a node in the lineage graph",
+    "temporal transform appends a new column named by 'as' after all existing columns",
+    "temporal diff: new value = current - previous; first row gets empty string",
+    "temporal cumsum: new value = cumulative sum from first row to current row",
+    "temporal pct_change: new value = (current - previous) / previous; first row empty; if previous is 0 result is empty string",
+    "Empty source cells produce empty output cells for all temporal functions",
+    "For diff and pct_change, an empty source cell resets the sequence so the following row also outputs empty string",
+    "For cumsum, an empty source cell does not affect the running sum"
+   ],
+   "affected_prior": [
+    "lineage command/step (round 5) \u2014 manifest step input/edge handling corrected",
+    "runPipeline transform dispatch (round 1) \u2014 new temporal op case added"
+   ],
+   "summary": "Corrects the lineage manifest step to omit input nodes and edges, and adds a temporal transform supporting diff, cumsum, and pct_change over a numeric column."
+  },
+  "instruction_head": "Add the following capabilities to `dpipe` and apply the specified behavior correction.\n\n## Behavior Correction: lineage manifest step\n\nThe `lineage` command previously treated the `\"manifest\"` step's `dir` field as a single input node, creating an edge from `dir` to the manifest output file.\n\nThis is incorrect. The `manifest` command scans a directory, not a specific input file. The corrected behavior:\n\n- `\"manifest\"` step has **no input nodes** (empty inputs array `[]`).\n- `\"manifest\"` step sti"
+ },
+ {
+  "round": 8,
+  "root": "/app",
+  "graph": {
+   "n_files": 9,
+   "n_edges": 14,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "csvio.go",
+     "pagerank": 0.327611,
+     "fan_in": 6,
+     "fan_out": 0
+    },
+    {
+     "file": "jsonutil.go",
+     "pagerank": 0.130064,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "compare.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 2
+    },
+    {
+     "file": "profile.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 3
+    },
+    {
+     "file": "stats.go",
+     "pagerank": 0.089148,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "pipeline.go",
+     "pagerank": 0.075018,
+     "fan_in": 1,
+     "fan_out": 3
+    },
+    {
+     "file": "expr.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 4
+    },
+    {
+     "file": "schema.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go",
+    "quality.go",
+    "pipeline.go"
+   ],
+   "target_symbols": [
+    "cmdQuality",
+    "runQuality",
+    "runPipeline",
+    "cmdLineage"
+   ],
+   "behavior_constraints": [
+    "New `quality` CLI command accepts --input and --output flags.",
+    "Per-column completeness = non_empty_count / total_rows (1.0 if total_rows is 0).",
+    "Per-column consistency = matching_count / non_empty_count (1.0 if non_empty_count is 0); detected type via ParseInt then ParseFloat then string.",
+    "Per-column uniqueness = unique_count / non_empty_count (1.0 if non_empty_count is 0).",
+    "quality_score is the average of completeness, consistency, and uniqueness.",
+    "Overall scores are averages across all columns.",
+    "Output JSON contains row_count, column_count, columns array (CSV header order), and overall_* fields, 2-space indented with trailing newline.",
+    "Missing input file exits 1 with 'ERROR: file not found: <path>'.",
+    "Empty CSV (no header) exits 1 with 'ERROR: empty CSV'.",
+    "Pipeline supports a 'quality' step type with input and output fields."
+   ],
+   "affected_prior": [
+    "main.go (command registration and dispatch)",
+    "pipeline.go (runPipeline step handling)",
+    "cmdLineage / lineage manifest construction"
+   ],
+   "summary": "This round adds a `quality` command and pipeline step that computes per-column completeness/consistency/uniqueness data quality scores and emits a JSON report, plus extends lineage to recognize quality steps."
+  },
+  "instruction_head": "Add the following capability to `dpipe`.\n\n## New command: `quality`\n\n`dpipe quality --input <path> --output <path>`\n\nComputes a data quality score for a CSV file based on three dimensions: completeness, consistency, and uniqueness.\n\n### Parameters\n\n- `--input`: path to the CSV file to analyze.\n- `--output`: path for the quality report JSON file.\n\n### Behavior\n\nRead the CSV file. For each column, compute:\n\n1. **Completeness**: the fraction of non-empty cells in the column. `completeness = non_emp"
+ },
+ {
+  "round": 9,
+  "root": "/app",
+  "graph": {
+   "n_files": 9,
+   "n_edges": 14,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "csvio.go",
+     "pagerank": 0.327611,
+     "fan_in": 6,
+     "fan_out": 0
+    },
+    {
+     "file": "jsonutil.go",
+     "pagerank": 0.130064,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "compare.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 2
+    },
+    {
+     "file": "profile.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 3
+    },
+    {
+     "file": "stats.go",
+     "pagerank": 0.089148,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "pipeline.go",
+     "pagerank": 0.075018,
+     "fan_in": 1,
+     "fan_out": 3
+    },
+    {
+     "file": "expr.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 4
+    },
+    {
+     "file": "schema.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go",
+    "schema.go",
+    "pipeline.go",
+    "lineage.go"
+   ],
+   "target_symbols": [
+    "main",
+    "cmdSchema",
+    "runSchema",
+    "InferSchema",
+    "inferColumnType",
+    "runPipeline",
+    "cmdLineage"
+   ],
+   "behavior_constraints": [
+    "schema command auto-infers JSON schema from CSV via --input/--output flags",
+    "Type detection uses strconv.ParseInt (base 10, 64-bit) then strconv.ParseFloat (64-bit), else string",
+    "required is true only when no empty values exist in the column and total_rows > 0",
+    "unique is true only when all non-empty values are distinct and at least one non-empty value exists",
+    "min/max included only for int/float types with non-empty values, as actual numeric values",
+    "enum included only for string type with 10 or fewer unique non-empty values, sorted alphabetically",
+    "Each column constraint object always includes type; required/unique/min/max/enum included only when applicable",
+    "strict field is always false",
+    "Column keys in columns map are sorted alphabetically (encoding/json default)",
+    "Output is 2-space indented JSON with trailing newline"
+   ],
+   "affected_prior": [
+    "quality.go",
+    "pipeline.go",
+    "lineage.go",
+    "main.go"
+   ],
+   "summary": "This round adds a schema command that auto-infers JSON schemas from CSV, a mask transform for sensitive data, a pipeline schema step, and lineage recognition of schema steps."
+  },
+  "instruction_head": "Add the following capabilities to `dpipe`.\n\n## New command: `schema`\n\n`dpipe schema --input <path> --output <path>`\n\nAuto-infers a JSON schema from CSV data. For each column, analyze all data rows:\n\n- **Type detection**: same logic as quality command. Try `strconv.ParseInt` (base 10, 64-bit) on all non-empty values. If all succeed, type is `\"int\"`. Else try `strconv.ParseFloat` (64-bit) on all. If all succeed, type is `\"float\"`. Else type is `\"string\"`.\n- **required**: true if no empty values in"
+ },
+ {
+  "round": 10,
+  "root": "/app",
+  "graph": {
+   "n_files": 9,
+   "n_edges": 14,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "csvio.go",
+     "pagerank": 0.327611,
+     "fan_in": 6,
+     "fan_out": 0
+    },
+    {
+     "file": "jsonutil.go",
+     "pagerank": 0.130064,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "compare.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 2
+    },
+    {
+     "file": "profile.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 3
+    },
+    {
+     "file": "stats.go",
+     "pagerank": 0.089148,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "pipeline.go",
+     "pagerank": 0.075018,
+     "fan_in": 1,
+     "fan_out": 3
+    },
+    {
+     "file": "expr.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 4
+    },
+    {
+     "file": "schema.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go",
+    "csvio.go",
+    "pipeline.go",
+    "lineage.go",
+    "reconcile.go"
+   ],
+   "target_symbols": [
+    "main",
+    "cmdManifest",
+    "ManifestEntry",
+    "cmdReconcile",
+    "runReconcile",
+    "ReconcileReport",
+    "runPipeline",
+    "cmdLineage"
+   ],
+   "behavior_constraints": [
+    "Manifest entries must use checksum and algorithm fields instead of blake2b; algorithm is always blake2b-256 and checksum is the hex BLAKE2b-256 hash.",
+    "BLAKE2b-256 hash computation remains unchanged.",
+    "reconcile reads two manifest JSON files with files arrays and compares entries by path.",
+    "reconcile classifies files as added, removed, modified, or unchanged using the checksum field.",
+    "added, removed, modified, and unchanged arrays are sorted alphabetically.",
+    "reconcile output is 2-space indented JSON with a trailing newline and includes summary counts total_left, total_right, added, removed, modified, unchanged.",
+    "Missing manifest file exits 1 with ERROR: file not found: <path>.",
+    "Invalid manifest JSON exits 1 with ERROR: invalid manifest: <path>.",
+    "Pipeline reconcile step uses left, right, and output fields.",
+    "Lineage recognizes reconcile steps with inputs left and right and output output."
+   ],
+   "affected_prior": [
+    "cmdManifest",
+    "ManifestEntry",
+    "cmdVerify",
+    "runPipeline",
+    "cmdLineage"
+   ],
+   "summary": "This round changes manifest JSON fields to checksum/algorithm, adds a reconcile command and pipeline step for diffing manifests, and extends lineage to recognize reconcile steps."
+  },
+  "instruction_head": "Add the following capabilities to `dpipe`.\n\n## Manifest format change (conflict)\n\nThe manifest output format changes. The `blake2b` JSON field is replaced with two new fields:\n\n- `checksum`: contains the hex-encoded hash (same BLAKE2b-256 computation as before).\n- `algorithm`: always `\"blake2b-256\"`.\n\nOld format per entry:\n```json\n{\"path\": \"file.csv\", \"size_bytes\": 100, \"blake2b\": \"abc123...\"}\n```\n\nNew format per entry:\n```json\n{\"path\": \"file.csv\", \"size_bytes\": 100, \"checksum\": \"abc123...\", \"al"
+ },
+ {
+  "round": 11,
+  "root": "/app",
+  "graph": {
+   "n_files": 9,
+   "n_edges": 14,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "csvio.go",
+     "pagerank": 0.327611,
+     "fan_in": 6,
+     "fan_out": 0
+    },
+    {
+     "file": "jsonutil.go",
+     "pagerank": 0.130064,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "compare.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 2
+    },
+    {
+     "file": "profile.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 3
+    },
+    {
+     "file": "stats.go",
+     "pagerank": 0.089148,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "pipeline.go",
+     "pagerank": 0.075018,
+     "fan_in": 1,
+     "fan_out": 3
+    },
+    {
+     "file": "expr.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 4
+    },
+    {
+     "file": "schema.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "fingerprint.go",
+    "main.go",
+    "pipeline.go",
+    "lineage.go"
+   ],
+   "target_symbols": [
+    "main",
+    "cmdFingerprint",
+    "runFingerprint",
+    "runPipeline",
+    "cmdLineage"
+   ],
+   "behavior_constraints": [
+    "fingerprint command outputs JSON with file_hash (BLAKE2b-256 of raw bytes), row_count (data rows excluding header), column_count (header columns), columns (sorted alphabetically), content_hash (BLAKE2b-256 of header line + lexicographically sorted data rows joined by newline with trailing newline)",
+    "fingerprint output is 2-space indented JSON with trailing newline",
+    "missing fingerprint input file: exit 1 with 'ERROR: file not found: <path>'",
+    "empty CSV (no header) for fingerprint: exit 1 with 'ERROR: empty CSV'",
+    "coalesce transform appends a new column taking first non-empty value from listed columns in order, empty string if all empty",
+    "coalesce on missing column: emit 'ERROR: invalid recipe: column <name> not found'",
+    "pipeline supports a 'fingerprint' step type with input and output fields",
+    "lineage command recognizes fingerprint steps: input field as input, output field as output"
+   ],
+   "affected_prior": [
+    "main.go command dispatch",
+    "pipeline.go recipe/step handling",
+    "lineage.go step recognition"
+   ],
+   "summary": "This round adds a fingerprint command producing deterministic CSV fingerprints, a coalesce transform combining multiple columns into one, a pipeline fingerprint step, and lineage recognition of fingerprint steps."
+  },
+  "instruction_head": "Add the following capabilities to `dpipe`.\n\n## New command: `fingerprint`\n\n`dpipe fingerprint --input <path> --output <path>`\n\nComputes a deterministic fingerprint of a CSV dataset for reproducibility verification.\n\n### Output format\n\n```json\n{\n  \"file_hash\": \"<blake2b-256 hex of raw file bytes>\",\n  \"row_count\": 3,\n  \"column_count\": 2,\n  \"columns\": [\"col1\", \"col2\"],\n  \"content_hash\": \"<blake2b-256 hex of normalized content>\"\n}\n```\n\nField details:\n\n- **file_hash**: BLAKE2b-256 hex digest of the r"
+ },
+ {
+  "round": 12,
+  "root": "/app",
+  "graph": {
+   "n_files": 9,
+   "n_edges": 14,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "csvio.go",
+     "pagerank": 0.327611,
+     "fan_in": 6,
+     "fan_out": 0
+    },
+    {
+     "file": "jsonutil.go",
+     "pagerank": 0.130064,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "compare.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 2
+    },
+    {
+     "file": "profile.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 3
+    },
+    {
+     "file": "stats.go",
+     "pagerank": 0.089148,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "pipeline.go",
+     "pagerank": 0.075018,
+     "fan_in": 1,
+     "fan_out": 3
+    },
+    {
+     "file": "expr.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 4
+    },
+    {
+     "file": "schema.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "pipeline.go"
+   ],
+   "target_symbols": [
+    "runPipeline",
+    "roundHalfAway"
+   ],
+   "behavior_constraints": [
+    "normalize with omitted or empty method must behave exactly like minmax.",
+    "normalize minmax/default path must output 0 for every numeric row when all numeric values are identical, avoiding divide by zero.",
+    "normalize minmax/default path otherwise must output (value - min) / (max - min) using the existing normalize numeric formatting.",
+    "explicit zscore and minmax normalize methods must remain unchanged.",
+    "round transform must append a new column named by as with source column values rounded to n decimal places.",
+    "round must write exactly n digits after the decimal point for numeric results.",
+    "round must use half-away-from-zero rounding for decimal places.",
+    "round must output an empty cell when the source cell is empty or non-numeric.",
+    "round must return ERROR: invalid recipe: column <name> not found when the source column is missing."
+   ],
+   "affected_prior": [
+    "normalize transform default/empty method handling",
+    "normalize minmax divide-by-zero behavior for identical values"
+   ],
+   "summary": "Fix normalize to default to minmax and handle identical values safely, and add a round transform that appends half-away-from-zero rounded numeric values with fixed decimal precision."
+  },
+  "instruction_head": "# Normalize default-method fix and round transform\n\n## Correction: Normalize transform default method\n\nThe `normalize` transform supports two explicit methods: `\"zscore\"` and `\"minmax\"`. When the `method` field is omitted or empty, normalize should now behave exactly like `\"minmax\"` instead of producing empty values.\n\nAdditionally, when all values in the column are identical (min == max), the default path must output `0` for every row instead of attempting `(value - min) / (max - min)` which wou"
+ }
+]

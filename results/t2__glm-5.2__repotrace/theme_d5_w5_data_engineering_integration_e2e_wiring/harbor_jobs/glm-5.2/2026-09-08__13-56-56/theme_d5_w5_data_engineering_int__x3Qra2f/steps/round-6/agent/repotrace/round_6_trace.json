@@ -1,0 +1,111 @@
+{
+ "round": 6,
+ "root": "/app",
+ "graph": {
+  "n_files": 11,
+  "n_edges": 39,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "internal/stage/group.go",
+    "pagerank": 0.175619,
+    "fan_in": 6,
+    "fan_out": 4
+   },
+   {
+    "file": "internal/config/config.go",
+    "pagerank": 0.173587,
+    "fan_in": 9,
+    "fan_out": 2
+   },
+   {
+    "file": "internal/stage/stage.go",
+    "pagerank": 0.161175,
+    "fan_in": 5,
+    "fan_out": 5
+   },
+   {
+    "file": "internal/record/record.go",
+    "pagerank": 0.15866,
+    "fan_in": 7,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/input/sqlite.go",
+    "pagerank": 0.085987,
+    "fan_in": 4,
+    "fan_out": 3
+   },
+   {
+    "file": "internal/stage/dedup.go",
+    "pagerank": 0.057217,
+    "fan_in": 2,
+    "fan_out": 4
+   },
+   {
+    "file": "internal/stage/join.go",
+    "pagerank": 0.057217,
+    "fan_in": 2,
+    "fan_out": 6
+   },
+   {
+    "file": "internal/input/input.go",
+    "pagerank": 0.037923,
+    "fan_in": 2,
+    "fan_out": 3
+   },
+   {
+    "file": "internal/pipeline/pipeline.go",
+    "pagerank": 0.036902,
+    "fan_in": 1,
+    "fan_out": 8
+   },
+   {
+    "file": "internal/output/output.go",
+    "pagerank": 0.029817,
+    "fan_in": 1,
+    "fan_out": 2
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "internal/stage/pivot.go",
+   "internal/stage/group.go",
+   "internal/stage/stage.go",
+   "internal/config/config.go"
+  ],
+  "target_symbols": [
+   "PivotConfig",
+   "buildPivot",
+   "Apply",
+   "Build",
+   "buildGroup",
+   "groupKey"
+  ],
+  "behavior_constraints": [
+   "A record missing a `group.by` column is no longer a hard error; the missing value is treated as empty string \"\" for forming the group key tuple (group never aborts on missing by columns).",
+   "A record missing the `column` referenced by a numeric group aggregate (sum/min/max/avg) contributes no value to that aggregate but is still counted by count.",
+   "If every record in a group lacks the numeric aggregate column, the rendered aggregate value is empty string \"\" (overrides sum-of-empty=0 only when all contributing records lacked the column).",
+   "A present-but-non-numeric value under a numeric group op still aborts with `flowctl: group: non-numeric value in column <col> at row <n>`.",
+   "pivot.index is required and non-empty; empty/missing is a config error: `flowctl: config: pivot: index must be a non-empty list`.",
+   "pivot.columns and pivot.values are required single-column names; empty/missing is a config error.",
+   "pivot.as must be `string` or `number`; `as:string` forbids sum/min/max/avg with `flowctl: config: pivot: agg <x> requires as: number`; `as:number` forbids first/last with `flowctl: config: pivot: agg <x> requires as: string`.",
+   "pivot.agg is one of sum|min|max|avg|count|first|last; any other value is a config error.",
+   "Under pivot.as:number, a non-parseable present value is a hard error: `flowctl: pivot: non-numeric value in column <col> at row <n>`; missing or empty-string values contribute nothing to numeric aggregates but still count for `count`.",
+   "pivot.agg=count renders a plain decimal integer string with no leading zeros/sign and is allowed under both as:string and as:number."
+  ],
+  "affected_prior": [
+   "group stage (round 2): missing `by` columns handling relaxed from hard error to empty-string grouping",
+   "group stage (round 2): numeric aggregate contribution rule for records missing the aggregate column"
+  ],
+  "summary": "Add a new `pivot` stage (index/columns/values/as/agg/fill/sort_columns/column_prefix/strict_schema/drop_empty/on_conflict) and relax `group` so missing `by` columns are treated as empty strings instead of aborting."
+ },
+ "instruction_head": "# Add a `pivot` stage, and relax `group`'s missing-`by` rule\n\nAdd a `pivot` stage, and relax the existing `group` handling for\nmissing `by` columns. All other behavior remains unchanged.\n\n## Relaxation to `group` \u2014 missing `by` columns are no longer a hard error\n\n### Previous behavior\n\nPreviously: *\"A record missing one of the `by` columns is a hard\nerror (abort the run with `flowctl: group: ...`).\"*\n\n### New behavior\n\n- A record that lacks a `by` column is **no longer a hard error**. The\n  miss"
+}

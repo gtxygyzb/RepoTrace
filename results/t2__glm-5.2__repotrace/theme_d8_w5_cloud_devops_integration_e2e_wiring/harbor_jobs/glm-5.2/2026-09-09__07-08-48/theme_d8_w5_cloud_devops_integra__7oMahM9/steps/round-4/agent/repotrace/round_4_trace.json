@@ -1,0 +1,53 @@
+{
+ "round": 4,
+ "root": "/app",
+ "graph": {
+  "n_files": 1,
+  "n_edges": 0,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "pipeline.sh",
+    "pagerank": 1.0,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "pipeline.sh"
+  ],
+  "target_symbols": [
+   "rollback",
+   "snapshot",
+   "restore",
+   "history"
+  ],
+  "behavior_constraints": [
+   "rollback must find the most recent non-rollback event for the service before the current deployment and restore that version instead of just removing the service",
+   "if no prior version exists in history, rollback removes the service entirely",
+   "rollback output format: `ROLLBACK <service> from <env>: <current_version> -> <previous_version>` or `ROLLBACK <service> from <env>: <current_version> -> (removed)`",
+   "rollback fails if the service is not currently deployed in the environment",
+   "rollback supports `--to-version <version>` flag to restore a specific version from history",
+   "if `--to-version` specified version is not in history for the service, print `ERROR: version not found in history for <service>`",
+   "`snapshot <environment>` creates a point-in-time snapshot with auto-incrementing ID starting at 1, recording all services with current versions and timestamps, output `SNAPSHOT <env> #<id> (<N> services)`",
+   "`snapshot --list <environment>` lists snapshots as `#<id> <iso_timestamp> (<N> services)`",
+   "`restore <environment> <snapshot_id>` replaces environment's service set with snapshot versions, prints `RESTORE <service> -> <env> (<version>)` per service, then `Restored <N> services from snapshot #<id>`",
+   "restore generates RESTORE event log entries for each service"
+  ],
+  "affected_prior": [
+   "rollback",
+   "history",
+   "deploy"
+  ],
+  "summary": "Fix rollback to restore the previous version from event history (with optional --to-version), and add snapshot/restore commands plus RESTORE events in history."
+ },
+ "instruction_head": "The rollback behavior is wrong \u2014 rolling back a service should restore the previous version from event history, not just remove it entirely. Also, the deploy command has been silently overwriting versions without any record of what was there before.\n\nFix rollback to work as an actual rollback: when you roll back a service from an environment, find the most recent non-rollback event for that service *before* the current deployment and restore that version. If there is no prior version (the servic"
+}

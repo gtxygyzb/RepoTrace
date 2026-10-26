@@ -1,0 +1,85 @@
+{
+ "round": 7,
+ "root": "/app",
+ "graph": {
+  "n_files": 5,
+  "n_edges": 1,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "internal/memtable/memtable.go",
+    "pagerank": 0.316239,
+    "fan_in": 1,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/mvcc/seqnum.go",
+    "pagerank": 0.17094,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/mvcc/snapshot.go",
+    "pagerank": 0.17094,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/tx/transaction.go",
+    "pagerank": 0.17094,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/wal/wal.go",
+    "pagerank": 0.17094,
+    "fan_in": 0,
+    "fan_out": 1
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "internal/wal/wal.go",
+   "internal/engine/engine.go",
+   "internal/mvcc/snapshot.go",
+   "cmd/kvstore/main.go"
+  ],
+  "target_symbols": [
+   "New",
+   "AppendSingle",
+   "AppendBatch",
+   "Replay",
+   "Close",
+   "Size",
+   "Path",
+   "Truncate",
+   "CURSOR_SEEK",
+   "CURSOR_PREV"
+  ],
+  "behavior_constraints": [
+   "WAL is stored as numbered segment files wal_000001.log, wal_000002.log, ... in the data directory instead of a single file",
+   "A new WAL segment is started when the current segment reaches or exceeds 64KB",
+   "On memtable flush, all WAL segments whose highest seqnum is <= the flushed seqnum are deleted",
+   "The active WAL segment is not truncated or deleted on memtable flush",
+   "On startup, all WAL segment files are replayed in numerical order",
+   "Per-segment CRC rules apply; a corrupted entry stops replay of that segment and all later segments are skipped entirely",
+   "CURSOR_SEEK to an existing key positions the cursor so an immediate CURSOR_PREV returns the key before the seeked key (e.g., PUT a,b,c,d; SEEK c returns c; PREV returns b, not c again)"
+  ],
+  "affected_prior": [
+   "WAL single-file implementation (rounds 1, 2, 4)",
+   "Engine memtable flush and WAL truncation logic (rounds 1, 3)",
+   "Engine startup/replay path (round 1)",
+   "Server-side cursor implementation (round 6)",
+   "MVCC snapshot cursor iteration (round 6)"
+  ],
+  "summary": "Rotate the WAL into numbered 64KB segment files with segment-level deletion on flush and numerical replay with corruption-skipping, and fix the cursor bug where CURSOR_PREV immediately after CURSOR_SEEK to an existing key returns the same key instead of the preceding one."
+ },
+ "instruction_head": "Two things this round.\n\nFirst, rotate the WAL into segments. Instead of a single WAL file, use numbered segment files: `wal_000001.log`, `wal_000002.log`, etc. in the data directory. Start a new segment when the current one reaches or exceeds 64KB. On memtable flush, delete all WAL segments whose highest seqnum is <= the flushed seqnum \u2014 don't truncate the active segment. On startup, replay all segment files in numerical order, applying the same CRC rules per segment \u2014 a corrupted entry stops re"
+}

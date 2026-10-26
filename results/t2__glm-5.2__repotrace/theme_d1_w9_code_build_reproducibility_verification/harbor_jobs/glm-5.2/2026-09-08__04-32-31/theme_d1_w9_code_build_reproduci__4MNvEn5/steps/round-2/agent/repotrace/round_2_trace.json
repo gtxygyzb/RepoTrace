@@ -1,0 +1,70 @@
+{
+ "round": 2,
+ "root": "/app",
+ "graph": {
+  "n_files": 1,
+  "n_edges": 0,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "main.go",
+    "pagerank": 1.0,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "main.go"
+  ],
+  "target_symbols": [
+   "main",
+   "cmdLock",
+   "cmdCheck",
+   "cmdLockDiff",
+   "Lockfile",
+   "LockTarget",
+   "loadLockfile",
+   "writeLockfile",
+   "computeSourceHashes",
+   "computeEnvValues",
+   "computeDepFingerprints",
+   "computeChangeReasons",
+   "computeImpactedBy",
+   "diffLockfiles"
+  ],
+  "behavior_constraints": [
+   "`buildvault lock <manifest_path>` builds all targets using cache (same behavior as build), prints stderr progress ([cache hit]/[building]/[stored]) identical to build, and on failure prints [failed] <name>: <detail> then exits 1.",
+   "`lock` emits exactly one line of compact JSON to stdout with version=1, created=current UTC RFC3339 timestamp, and a targets map keyed by target name; each target entry includes fingerprint, output_hash, source_hashes (per source file SHA-256 hex), dep_fingerprints ({} if no deps), env_values ({} if no env_capture, empty string for unset vars), compiler, and flags (preserving manifest order).",
+   "`buildvault check <manifest_path> --lockfile <lockfile_path>` builds all targets then emits one line of JSON to stdout containing all_match (true only if every target matches fingerprint and output), and a targets array in topological build order, each with name, fingerprint_match, output_match, change_reasons (sorted), and impacted_by (sorted).",
+   "change_reasons may include compiler_changed, dep_changed, env_changed, flags_changed, source_changed; the array is empty when fingerprint matches, and equals [\"new_target\"] when the target is absent from the lockfile.",
+   "impacted_by is [] whenever fingerprint_match is true; otherwise it lists all direct/transitive dependencies whose own fingerprint does not match the lockfile's fingerprint for that dependency, sorted alphabetically.",
+   "For targets absent from the lockfile: fingerprint_match=false, output_match=false, change_reasons=[\"new_target\"], and impacted_by lists all direct/transitive dependencies also absent from the lockfile (sorted).",
+   "dep_changed condition: a dependency's current fingerprint differs from lockfile, or a dep exists only in current manifest, or only in lockfile's dep_fingerprints.",
+   "env_changed condition: a captured env value differs, or env var exists only in current env_capture, or only in lockfile's env_values.",
+   "source_changed condition: a source SHA-256 differs, or source exists only in current manifest, or only in lockfile's source_hashes.",
+   "flags_changed is order-sensitive; compiler_changed compares the compiler string."
+  ],
+  "affected_prior": [
+   "main",
+   "Manifest",
+   "Target",
+   "cmdBuild",
+   "buildAndStoreTarget",
+   "runBuild",
+   "topologicalOrder",
+   "transitiveDeps",
+   "computeFingerprint",
+   "storeArtifact"
+  ],
+  "summary": "Round 2 adds `lock`, `check`, and `lock-diff` subcommands that capture full build provenance into a versioned lockfile, verify current source state reproduces the locked state with detailed change analysis, and diff two lockfile snapshots without building."
+ },
+ "instruction_head": "Extend `buildvault` with three new commands: `lock`, `check`, and `lock-diff`. These commands enable teams to capture a \"known good\" state of all build artifacts with full provenance metadata, verify that the current source state still reproduces that exact state with detailed change analysis, and compare two lockfile snapshots.\n\n## New Command: `buildvault lock <manifest_path>`\n\nBuild all targets (using cache if available, same behavior as `build`), then output a lockfile JSON to stdout.\n\nLockf"
+}

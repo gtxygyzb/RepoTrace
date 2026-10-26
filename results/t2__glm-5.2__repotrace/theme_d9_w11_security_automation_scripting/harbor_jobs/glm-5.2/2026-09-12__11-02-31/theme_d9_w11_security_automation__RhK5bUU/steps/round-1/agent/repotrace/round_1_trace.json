@@ -1,0 +1,57 @@
+{
+ "round": 1,
+ "root": "/app",
+ "graph": {
+  "n_files": 0,
+  "n_edges": 0,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": []
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "main.go",
+   "analyze.go",
+   "summarize.go",
+   "event.go",
+   "threats.go",
+   "chain.go"
+  ],
+  "target_symbols": [
+   "main",
+   "runAnalyze",
+   "runSummarize",
+   "parseEvent",
+   "detectBruteForce",
+   "detectPortScan",
+   "detectDataExfiltration",
+   "detectPrivilegeEscalation",
+   "detectLateralMovement",
+   "detectDNSTunneling",
+   "correlateChains",
+   "summarizeLogs",
+   "SeverityValue",
+   "Event"
+  ],
+  "behavior_constraints": [
+   "secsentinel is a Go CLI with `analyze` and `summarize` subcommands; reads JSON log lines from stdin",
+   "Each input log line is a JSON object with fields: timestamp, source_ip, dest_ip, dest_port, protocol, action, event_type, user, severity, payload_size, metadata",
+   "severity order low<medium<high<critical (1<2<3<4)",
+   "Brute Force: 5+ auth_failure events from same source_ip within any 60s sliding window; output count, first/last_seen, sorted unique target_users; risk=count*10.0 if >3 distinct users else count*5.0",
+   "Port Scan: single source_ip sends connection/port_scan events to 10+ distinct dest_port values on same dest_ip within any 300s sliding window; output sorted ports_scanned; risk=ports*3.0 + 20.0 if any of 22,3389,445,1433,3306,5432 in set",
+   "Data Exfiltration: total payload_size from single source_ip exceeds 104857600 bytes within any 3600s sliding window where events have action ALLOW; output total_bytes, sorted dest_ips; risk=(total_bytes/1048576.0)*0.5",
+   "Privilege Escalation: auth_success with metadata.privilege_change=elevated and same user had >=1 auth_failure in preceding 300s; output user, source_ip, timestamp, prior_failures; risk=prior_failures*25.0",
+   "Lateral Movement: single source_ip makes auth_success connections to 3+ distinct dest_ips within any 600s sliding window, each dest_ip preceded by auth_failure from same source_ip to same dest_ip within past 300s; output sorted compromised_hosts; risk=hosts*40.0",
+   "DNS Tunneling: single source_ip generates 50+ dns_query events within any 60s sliding window with avg payload_size > 512 bytes; output query_count, avg_payload (2 decimals); risk=(avg_payload/512.0)*query_count*0.5",
+   "Threats output sorted by risk_score desc, then first_seen asc, then threat_type alphabetically"
+  ],
+  "affected_prior": [],
+  "summary": "Round 1 builds a new Go CLI tool secsentinel from scratch with analyze (six threat detectors plus --chain attack correlation) and summarize (JSON and text formats) subcommands reading structured security event logs from stdin."
+ },
+ "instruction_head": "Build a security log analysis and automated threat-response CLI tool called `secsentinel` in Go. The tool processes structured security event logs and performs multi-layered threat detection with correlated attack chain analysis, configurable rule evaluation, alert management, and automated response script generation.\n\nEach input log line is a JSON object with these fields:\n\n- `timestamp`: ISO 8601 string (e.g. `\"2024-01-15T08:30:00Z\"`)\n- `source_ip`: IPv4 address string\n- `dest_ip`: IPv4 addres"
+}

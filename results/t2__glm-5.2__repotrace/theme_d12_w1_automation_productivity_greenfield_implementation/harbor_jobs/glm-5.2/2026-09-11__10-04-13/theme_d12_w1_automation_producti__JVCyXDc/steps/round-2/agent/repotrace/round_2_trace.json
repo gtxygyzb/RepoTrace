@@ -1,0 +1,66 @@
+{
+ "round": 2,
+ "root": "/app",
+ "graph": {
+  "n_files": 1,
+  "n_edges": 0,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "cmd/flowr/main.go",
+    "pagerank": 1.0,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "cmd/flowr/main.go",
+   "go.mod"
+  ],
+  "target_symbols": [
+   "main",
+   "parseWorkflow",
+   "computeCacheKey",
+   "lookupCache",
+   "writeCacheEntry",
+   "cachePrune",
+   "runWorkflow",
+   "expandInputs",
+   "sha256File",
+   "executeStep",
+   "buildReport"
+  ],
+  "behavior_constraints": [
+   "Steps may declare optional `inputs` (file globs: *, **, or exact paths) and `outputs` (exact file paths) lists",
+   "Inputs match only regular files; directories and non-regular-file symlinks are ignored",
+   "Literal input pattern with no matching file => cache-key failure: exit_code null, status 'failed', step never launches shell, counts as failed for halt/continue and global run status",
+   "Steps with neither inputs nor outputs are not cacheable and always execute as before",
+   "Cache key = SHA-256 of deterministic JSON serialization of {cmd, env, matrix, inputs, outputs} with keys in that exact order, no extra whitespace, UTF-8",
+   "cmd field uses final interpolated command, or JSON array of pipe stages for pipelined steps",
+   "env field is sorted-by-key list of [key,value] pairs composed of workflow env + step env + FLOWR_STEP and FLOWR_MATRIX_* builtins; parent-process env and run-dependent FLOWR_* (notably FLOWR_RUN_ID) are excluded from hash but still exported",
+   "inputs field is sorted-by-path-ascending list of [path, sha256(content)] pairs",
+   "outputs field is sorted-ascending list of declared output paths",
+   "Cache entries stored at .flowr/cache/<key>.json with {key, created_at (RFC-3339 millisecond UTC), outputs:[{path, sha256}]}"
+  ],
+  "affected_prior": [
+   "main",
+   "parseWorkflow",
+   "runWorkflow/executeStep",
+   "DAG scheduler",
+   "report.json generation",
+   "events log",
+   "step directory/meta.json writer",
+   "go.mod"
+  ],
+  "summary": "Round 2 layers a content-addressed build cache (inputs/outputs globs, SHA-256 cache key, .flowr/cache entries, cache hits/misses, --no-cache flag, flowr cache prune), resource reservations with peak tracking, and a pipelined command form onto the existing flowr orchestrator without regressing prior behavior."
+ },
+ "instruction_head": "# flowr \u2014 incremental execution, resource reservations, and pipelines\n\nExtend the existing `flowr` orchestrator with three feature families: a content-addressed build cache that lets repeat runs skip work, resource reservations so the scheduler can respect CPU and memory budgets, and a pipelined command form for steps that want to chain programs with shell pipes. All previously specified behavior continues to hold; the additions are layered on top and must not regress any existing guarantee.\n\n##"
+}

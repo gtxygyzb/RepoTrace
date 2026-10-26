@@ -1,0 +1,109 @@
+{
+ "round": 12,
+ "root": "/app",
+ "graph": {
+  "n_files": 7,
+  "n_edges": 10,
+  "delta": {
+   "files_added": [
+    "sharding_report.go"
+   ],
+   "files_removed": [],
+   "edges_added": [
+    [
+     "cli.go",
+     "sharding_report.go"
+    ],
+    [
+     "sharding_report.go",
+     "helpers.go"
+    ]
+   ],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "helpers.go",
+    "pagerank": 0.414134,
+    "fan_in": 5,
+    "fan_out": 0
+   },
+   {
+    "file": "main.go",
+    "pagerank": 0.136095,
+    "fan_in": 2,
+    "fan_out": 1
+   },
+   {
+    "file": "manifest.go",
+    "pagerank": 0.095505,
+    "fan_in": 1,
+    "fan_out": 1
+   },
+   {
+    "file": "schema.go",
+    "pagerank": 0.095505,
+    "fan_in": 1,
+    "fan_out": 2
+   },
+   {
+    "file": "sharding_report.go",
+    "pagerank": 0.095505,
+    "fan_in": 1,
+    "fan_out": 1
+   },
+   {
+    "file": "cli.go",
+    "pagerank": 0.081628,
+    "fan_in": 0,
+    "fan_out": 5
+   },
+   {
+    "file": "types.go",
+    "pagerank": 0.081628,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "cli.go",
+   "main.go",
+   "types.go",
+   "helpers.go",
+   "run_provenance.go"
+  ],
+  "target_symbols": [
+   "parseArgs",
+   "nextArg",
+   "run",
+   "parentDirExists",
+   "atomicWriteFile",
+   "sha256Hex",
+   "buildManifest",
+   "writeRunProvenanceSidecar"
+  ],
+  "behavior_constraints": [
+   "When all three flags (--run-provenance, --run-provenance-digest, --run-provenance-strict) are absent, every existing output remains byte-for-byte unchanged.",
+   "Empty value for --run-provenance or --run-provenance-digest exits 2 with exact stderr line and no output files created.",
+   "Missing parent directory for --run-provenance or --run-provenance-digest path exits 2 with exact stderr line and no output files created, checked before any output file is written.",
+   "--run-provenance-digest and --run-provenance-strict each require --run-provenance; missing it exits 2 with exact stderr line and no output files created.",
+   "--run-provenance-strict=true (bare or =true) rejects empty input dir (zero conforming shards) with exit 2 and exact stderr line; absent or =false keeps default behavior.",
+   "Validation order: empty-value check at parse time; requires-run-provenance check at parse time; parent-dir-exists check before any output file is written; empty-input-dir check for strict fires right after parent-dir check and before any output file is written.",
+   "Run-provenance file is pretty-printed JSON with 2-space indentation and a trailing newline, written via .tmp + rename after all other outputs (including every existing sidecar) are finalized.",
+   "Default top-level keys in exact order: schema_version, tool_version, flags, inputs_fingerprint, shard_count.",
+   "Strict mode extends key list in order with argv_sha256 and env_fingerprint immediately after shard_count; these keys appear ONLY when strict is explicitly true.",
+   "schema_version is fixed string 'eventq.run-provenance/v1'; tool_version is fixed string 'eventq/0.5.0'."
+  ],
+  "affected_prior": [
+   "cli.go parseArgs/run flag parsing",
+   "main.go ingest/shard enumeration",
+   "types.go sidecar type definitions",
+   "helpers.go parentDirExists/atomicWriteFile/sha256Hex usage"
+  ],
+  "summary": "This round adds a standalone run-provenance sidecar (with optional digest and strict mode) to eventq ingest that records observed flag values and a sha256 input-shard fingerprint, gated by validation rules and emitting canonical JSON after all other outputs are finalized."
+ },
+ "instruction_head": "# Run Provenance Sidecars\n\nAdd a standalone run-provenance sidecar so operators can see which\n`eventq ingest` flag values were observed on the command line and how the set\nof input shards was fingerprinted. The new sidecar avoids reconstructing that\ninformation from logs, state files, manifests, and other sidecars.\n\n`eventq ingest` now accepts exactly three new optional flags:\n`--run-provenance`, `--run-provenance-digest`, and\n`--run-provenance-strict`. When all three flags are absent, every exi"
+}

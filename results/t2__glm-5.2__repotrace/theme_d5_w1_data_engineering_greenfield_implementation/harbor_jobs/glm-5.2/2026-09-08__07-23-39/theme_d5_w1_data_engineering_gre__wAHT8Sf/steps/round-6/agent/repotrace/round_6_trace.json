@@ -1,0 +1,117 @@
+{
+ "round": 6,
+ "root": "/app",
+ "graph": {
+  "n_files": 5,
+  "n_edges": 5,
+  "delta": {
+   "files_added": [
+    "cli.go",
+    "helpers.go",
+    "manifest.go",
+    "types.go"
+   ],
+   "files_removed": [],
+   "edges_added": [
+    [
+     "cli.go",
+     "helpers.go"
+    ],
+    [
+     "cli.go",
+     "main.go"
+    ],
+    [
+     "cli.go",
+     "manifest.go"
+    ],
+    [
+     "main.go",
+     "helpers.go"
+    ],
+    [
+     "manifest.go",
+     "helpers.go"
+    ]
+   ],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "helpers.go",
+    "pagerank": 0.431417,
+    "fan_in": 3,
+    "fan_out": 0
+   },
+   {
+    "file": "main.go",
+    "pagerank": 0.159784,
+    "fan_in": 1,
+    "fan_out": 1
+   },
+   {
+    "file": "manifest.go",
+    "pagerank": 0.159784,
+    "fan_in": 1,
+    "fan_out": 1
+   },
+   {
+    "file": "cli.go",
+    "pagerank": 0.124507,
+    "fan_in": 0,
+    "fan_out": 3
+   },
+   {
+    "file": "types.go",
+    "pagerank": 0.124507,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "cli.go",
+   "main.go",
+   "types.go"
+  ],
+  "target_symbols": [
+   "parseArgs",
+   "nextArg",
+   "run",
+   "parseEvent",
+   "loadState",
+   "buildStateOut",
+   "statePendingOutList",
+   "stateOpenSessionOutList",
+   "MarshalJSON",
+   "sortedPending",
+   "sortedOpenSessions",
+   "sortedCarriedSessions",
+   "sortedSeenIDs",
+   "bucketCode",
+   "buildManifest"
+  ],
+  "behavior_constraints": [
+   "--dedup-policy accepts exactly {first-arrival, lex-largest-ts}; unknown/empty value exits 2 with stderr line: ingest: --dedup-policy: must be one of {first-arrival, lex-largest-ts}",
+   "Omitting --dedup-policy or setting lex-largest-ts yields byte-for-byte identical output, rejects, state-out, audit-log, audit-log-digest, and manifest vs. prior round behavior",
+   "Under first-arrival, winner in a same-run duplicate group is the event with smallest (shard_basename, line_index); ts is not consulted",
+   "Cross-run dedup against state.seen_ids is unchanged by policy; cross_run duplicates remain unaffected",
+   "Rejects file still four-bucket layout in arrival order; duplicate bucket contains the non-winners under the active policy",
+   "anomalies.duplicate count unchanged between policies for same input",
+   "Audit log: same_run duplicate records under first-arrival carry winner_arrival={shard,line} immediately after reason; never emitted under lex-largest-ts/default; never on cross_run; never on non-duplicate buckets",
+   "Audit-log-digest duplicate_reasons still has exactly same_run and cross_run counts; winner_arrival is not surfaced in digest",
+   "When --audit-log-digest, --audit-log, and --dedup-policy are all set, digest gains dedup_policy_stats block positioned after resolved_against and before sha256",
+   "Flag composes freely with state, audit log, manifest, rates-strict, FX staleness flags"
+  ],
+  "affected_prior": [
+   "ingest dedup/winner selection (round 1-2)",
+   "audit-log duplicate records (round 3)",
+   "audit-log-digest block layout (round 3)",
+   "manifest feature defaults (round 5)"
+  ],
+  "summary": "This round adds an optional --dedup-policy flag to eventq ingest selecting between the existing lex-largest-ts winner rule (default, byte-compatible) and a new first-arrival rule that picks the earliest (shard_basename, line_index) duplicate-group survivor, surfaces a winner_arrival object on same_run duplicate audit records only under first-arrival, and adds a dedup_policy_stats block to the audit-log digest when policy is set."
+ },
+ "instruction_head": "# Configurable Dedup Policy\n\nSame-run duplicate handling now has an explicit policy selector:\n`--dedup-policy <first-arrival|lex-largest-ts>`. The default keeps the existing\nwinner rule: the lexicographically largest `ts` wins, with arrival order used\nas the tie-breaker. The `first-arrival` policy deliberately chooses the event\nwith the smallest `(shard_basename, line_index)` in the duplicate group,\nignoring `ts` for winner selection.\n\nThis means a duplicate group with increasing timestamps acro"
+}

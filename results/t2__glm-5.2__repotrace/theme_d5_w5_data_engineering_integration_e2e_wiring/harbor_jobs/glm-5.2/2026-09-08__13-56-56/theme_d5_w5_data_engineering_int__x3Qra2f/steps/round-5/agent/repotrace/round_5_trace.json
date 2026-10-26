@@ -1,0 +1,139 @@
+{
+ "round": 5,
+ "root": "/app",
+ "graph": {
+  "n_files": 11,
+  "n_edges": 39,
+  "delta": {
+   "files_added": [
+    "internal/stage/dedup.go"
+   ],
+   "files_removed": [],
+   "edges_added": [
+    [
+     "internal/pipeline/pipeline.go",
+     "internal/stage/dedup.go"
+    ],
+    [
+     "internal/stage/dedup.go",
+     "internal/config/config.go"
+    ],
+    [
+     "internal/stage/dedup.go",
+     "internal/record/record.go"
+    ],
+    [
+     "internal/stage/dedup.go",
+     "internal/stage/group.go"
+    ],
+    [
+     "internal/stage/dedup.go",
+     "internal/stage/stage.go"
+    ],
+    [
+     "internal/stage/stage.go",
+     "internal/stage/dedup.go"
+    ]
+   ],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "internal/stage/group.go",
+    "pagerank": 0.175619,
+    "fan_in": 6,
+    "fan_out": 4
+   },
+   {
+    "file": "internal/config/config.go",
+    "pagerank": 0.173587,
+    "fan_in": 9,
+    "fan_out": 2
+   },
+   {
+    "file": "internal/stage/stage.go",
+    "pagerank": 0.161175,
+    "fan_in": 5,
+    "fan_out": 5
+   },
+   {
+    "file": "internal/record/record.go",
+    "pagerank": 0.15866,
+    "fan_in": 7,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/input/sqlite.go",
+    "pagerank": 0.085987,
+    "fan_in": 4,
+    "fan_out": 3
+   },
+   {
+    "file": "internal/stage/dedup.go",
+    "pagerank": 0.057217,
+    "fan_in": 2,
+    "fan_out": 4
+   },
+   {
+    "file": "internal/stage/join.go",
+    "pagerank": 0.057217,
+    "fan_in": 2,
+    "fan_out": 6
+   },
+   {
+    "file": "internal/input/input.go",
+    "pagerank": 0.037923,
+    "fan_in": 2,
+    "fan_out": 3
+   },
+   {
+    "file": "internal/pipeline/pipeline.go",
+    "pagerank": 0.036902,
+    "fan_in": 1,
+    "fan_out": 8
+   },
+   {
+    "file": "internal/output/output.go",
+    "pagerank": 0.029817,
+    "fan_in": 1,
+    "fan_out": 2
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "internal/stage/rank.go",
+   "internal/config/config.go",
+   "internal/stage/stage.go"
+  ],
+  "target_symbols": [
+   "RankConfig",
+   "RankKeyConfig",
+   "RankBoundsConfig",
+   "buildRank",
+   "Apply",
+   "Build",
+   "StageConfig"
+  ],
+  "behavior_constraints": [
+   "A rank stage is recognized by config and stage.Build; invalid rank config produces stderr lines starting with flowctl: config: rank: and aborts.",
+   "partition_by defaults to empty; records group by exact string values of all partition_by columns; empty string does not suppress grouping; a participating record missing a partition_by column aborts with flowctl: rank: .",
+   "order_by is required and non-empty; each key requires column, as string|number, order asc|desc, and null_position first|last; bad null_position is config error flowctl: config: rank: null_position must be first or last.",
+   "For rank only, sentinel-equivalent values are placed first or last per null_position regardless of order; non-sentinel values compare by order; non-parseable present numeric values abort with flowctl: rank: .",
+   "method defaults to dense; dense has no gaps, rank skips ties, row gives distinct consecutive integers broken by ingest order, percent emits percent-rank strings.",
+   "percent computes rank-style integer ranks starting at 1, then p_i=(r_i-1)/max(1,n_part-1) formatted as exactly 6 decimal digits with banker's rounding, leading 0 in [0,1), no exponent, no plus, no trimming; single participating record yields 0.000000; start is rejected for percent.",
+   "into is required and must name a new column not already present on any participating input record; presence of the key aborts with flowctl: rank: even if empty; non-participating records pass through without into.",
+   "start defaults to 1, must be a non-negative integer literal, and sets the rank of the first distinct order_by tuple per partition.",
+   "skip_nulls defaults false; when true records whose entire order_by tuple is all-sentinel do not participate, are emitted unchanged at original ingest positions, do not affect counters/tie counts or into checks, and may lack partition_by columns without aborting.",
+   "reset_on optionally resets the rank counter within each partition's sorted order on value change; each run ranks independently from start; peer counts remain partition-wide; reset_on is rejected with percent, with into, with emit_peers, and when empty; missing reset_on values group as empty string."
+  ],
+  "affected_prior": [
+   "StageConfig parsing in internal/config/config.go must accept the new rank stage",
+   "stage.Build dispatch in internal/stage/stage.go must route rank to buildRank",
+   "existing sort/dedup sentinel and group-key conventions are relied on by rank but must remain unchanged"
+  ],
+  "summary": "Add a rank stage that assigns dense/rank/row/percent ranks within partition_by groups using ordered keys with null_position, skip_nulls, reset_on, bounds, and into-column semantics, without changing existing behavior."
+ },
+ "instruction_head": "# Add a `rank` stage for per-group ordered row-numbering\n\nAdd a `rank` stage for ordered row-numbering within each group. All\nexisting behavior remains unchanged.\n\n## New stage: `rank`\n\n```yaml\n- type: rank\n  partition_by: [region, customer]   # optional; defaults to []\n  order_by:                          # required, non-empty\n    - column: amount\n      as: number\n      order: desc\n      null_position: last            # required per key (first|last)\n    - column: order_id\n      as: string\n     "
+}

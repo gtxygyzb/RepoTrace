@@ -1,0 +1,632 @@
+[
+ {
+  "round": 1,
+  "root": "/app",
+  "graph": {
+   "n_files": 0,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": []
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "pipeline.sh"
+   ],
+   "target_symbols": [
+    "validate",
+    "order",
+    "build",
+    "test",
+    "deploy",
+    "status",
+    "rollback",
+    "graph"
+   ],
+   "behavior_constraints": [
+    "Tool exists at /app/pipeline.sh and is a CLI supporting subcommands: validate, order, build, test, deploy, status, rollback, graph",
+    "validate parses /app/pipeline.yaml and checks YAML syntax, required service fields (path, build_cmd, test_cmd, port, depends_on, health_endpoint), required environment fields (deploy_target, health_check_port, max_replicas), no duplicate port assignments, no circular dependencies, all depends_on references point to defined services",
+    "validate prints VALID on success or ERROR: <description> with first error found",
+    "order prints topologically-sorted build/deploy order, one service per line, respecting depends_on, alphabetical sorting among services at same topological level",
+    "build without --service builds all services in dependency order",
+    "build with --service NAME builds only that service plus its transitive dependencies",
+    "build writes artifact at <service_path>/build/artifact.txt containing <service_name>:<epoch_seconds>:built",
+    "build prints BUILD <service_name> OK per service, or BUILD <service_name> FAIL: <reason> when service path doesn't exist",
+    "build with --parallel outputs parallelizable build waves, each line comma-separated services alphabetically sorted, services in same wave have no interdependencies within the building set",
+    "build with both --service and --parallel restricts waves to named service plus its transitive dependencies"
+   ],
+   "affected_prior": [],
+   "summary": "Create a multi-service deployment pipeline orchestrator CLI at /app/pipeline.sh supporting validate, order, build, test, deploy, status, rollback, and graph commands with all persistent state under /app/.pipeline/."
+  },
+  "instruction_head": "Build a multi-service deployment pipeline orchestrator as a CLI tool at `/app/pipeline.sh`.\n\nThe system manages end-to-end build, test, and deploy workflows for a microservices architecture. The project already has a YAML manifest at `/app/pipeline.yaml` and a set of service directories under `/app/services/`. The manifest defines the services, their dependency relationships, and the target environments.\n\nThe pipeline orchestrator needs to support the following commands:\n\n**`pipeline.sh validate"
+ },
+ {
+  "round": 2,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [
+     "pipeline.sh"
+    ],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "pipeline.sh",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "pipeline.sh"
+   ],
+   "target_symbols": [
+    "promote",
+    "diff",
+    "history",
+    "deploy",
+    "rollback"
+   ],
+   "behavior_constraints": [
+    "promote copies deployment state from source env to target env; both envs must exist in manifest or error",
+    "promote processes services in dependency order",
+    "promote prints `PROMOTE <service> -> <target>: SKIP (same version)` when target already has exact same version",
+    "promote prints `PROMOTE <service> -> <target> OK` when copying deployment to target",
+    "services not deployed in source are silently skipped during promote",
+    "promote does not require tests; reuses already-deployed artifacts",
+    "promote --service NAME promotes only that service plus transitive dependencies",
+    "promote --dry-run prints `DRY-RUN promote from <source> to <target>:` header then `  Would promote <service>` for each service that would actually change (excluding skips)",
+    "promote summary line after processing (non-dry-run): `Promoted N, skipped M`",
+    "diff compares deployment states of two envs; both must exist in manifest or error"
+   ],
+   "affected_prior": [
+    "deploy",
+    "rollback",
+    "manifest/state infrastructure from round 1"
+   ],
+   "summary": "Add promote, diff, and history commands plus a per-environment append-only event log, and modify deploy/rollback to record events."
+  },
+  "instruction_head": "Extend the pipeline orchestrator with three new commands that build on the existing deployment infrastructure: `promote`, `diff`, and `history`. Additionally, all deployment-related commands must now record events into a per-environment event log so that history tracking works.\n\n**`pipeline.sh promote <source-env> <target-env> [--service NAME] [--dry-run]`** \u2014 Copy deployment state from a source environment to a target environment. Both environments must exist in the manifest. Services are promo"
+ },
+ {
+  "round": 3,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "pipeline.sh",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "pipeline.sh"
+   ],
+   "target_symbols": [
+    "validate",
+    "build",
+    "diff",
+    "promote",
+    "history",
+    "bump",
+    "main"
+   ],
+   "behavior_constraints": [
+    "Each service in the manifest must include a `version` field matching `N.N.N` (three dot-separated non-negative integers).",
+    "Manifest initial versions: api-gateway 2.1.0, user-service 1.3.0, order-service 1.0.0, notification-service 0.8.0, analytics-service 1.9.0.",
+    "validate must error when a service is missing `version` or its value does not match the N.N.N pattern.",
+    "build artifact format must be `<name>:<version>+build.<timestamp>` using the service's manifest version.",
+    "diff must extract semver (between first colon and `+build.`) and build timestamp (after `+build.`), compare major/minor/patch numerically (not lexicographically), use build timestamp as tiebreaker when semver identical.",
+    "diff output format remains: `DIFFERS: <service> <v1> vs <v2> (<envX> newer)`.",
+    "promote must detect downgrade conflicts: if target env has strictly higher semver than source, it is a conflict.",
+    "promote without `--force` on a conflict prints `CONFLICT: <service> -> <target>: downgrade (<source_semver> < <target_semver>)` and does not promote that service.",
+    "promote with `--force` overrides conflict, promotes the service, prints `PROMOTE <service> -> <target> OK (forced)`.",
+    "promote summary line must be `Promoted N, skipped M, conflicts C` where forced overrides count as promotions making C zero."
+   ],
+   "affected_prior": [
+    "validate",
+    "build",
+    "diff",
+    "promote",
+    "history",
+    "main"
+   ],
+   "summary": "Migrate the pipeline orchestrator to semantic versioning by adding a `version` field to the manifest, modifying validate/build/diff/promote/history to use semver-aware logic, and adding a new `bump` command."
+  },
+  "instruction_head": "Migrate the pipeline orchestrator to semantic versioning. Each service in the manifest must now include a `version` field in `N.N.N` format (three dot-separated non-negative integers). Add the following initial versions to the manifest:\n\n| Service | Version |\n|---------|---------|\n| api-gateway | 2.1.0 |\n| user-service | 1.3.0 |\n| order-service | 1.0.0 |\n| notification-service | 0.8.0 |\n| analytics-service | 1.9.0 |\n\nThis migration changes the build artifact format and version comparison logic a"
+ },
+ {
+  "round": 4,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "pipeline.sh",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "pipeline.sh"
+   ],
+   "target_symbols": [
+    "rollback",
+    "snapshot",
+    "restore",
+    "history"
+   ],
+   "behavior_constraints": [
+    "rollback must find the most recent non-rollback event for the service before the current deployment and restore that version instead of just removing the service",
+    "if no prior version exists in history, rollback removes the service entirely",
+    "rollback output format: `ROLLBACK <service> from <env>: <current_version> -> <previous_version>` or `ROLLBACK <service> from <env>: <current_version> -> (removed)`",
+    "rollback fails if the service is not currently deployed in the environment",
+    "rollback supports `--to-version <version>` flag to restore a specific version from history",
+    "if `--to-version` specified version is not in history for the service, print `ERROR: version not found in history for <service>`",
+    "`snapshot <environment>` creates a point-in-time snapshot with auto-incrementing ID starting at 1, recording all services with current versions and timestamps, output `SNAPSHOT <env> #<id> (<N> services)`",
+    "`snapshot --list <environment>` lists snapshots as `#<id> <iso_timestamp> (<N> services)`",
+    "`restore <environment> <snapshot_id>` replaces environment's service set with snapshot versions, prints `RESTORE <service> -> <env> (<version>)` per service, then `Restored <N> services from snapshot #<id>`",
+    "restore generates RESTORE event log entries for each service"
+   ],
+   "affected_prior": [
+    "rollback",
+    "history",
+    "deploy"
+   ],
+   "summary": "Fix rollback to restore the previous version from event history (with optional --to-version), and add snapshot/restore commands plus RESTORE events in history."
+  },
+  "instruction_head": "The rollback behavior is wrong \u2014 rolling back a service should restore the previous version from event history, not just remove it entirely. Also, the deploy command has been silently overwriting versions without any record of what was there before.\n\nFix rollback to work as an actual rollback: when you roll back a service from an environment, find the most recent non-rollback event for that service *before* the current deployment and restore that version. If there is no prior version (the servic"
+ },
+ {
+  "round": 5,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "pipeline.sh",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "pipeline.sh"
+   ],
+   "target_symbols": [
+    "lock",
+    "unlock",
+    "deploy",
+    "promote",
+    "rollback",
+    "restore",
+    "status",
+    "history"
+   ],
+   "behavior_constraints": [
+    "`lock <env> [--reason REASON]` prints `LOCKED <env>: <reason>` with default reason `manual lock`; is idempotent (updates reason if already locked); errors `ERROR: unknown environment <env>` for unknown env.",
+    "`unlock <env>` prints `UNLOCKED <env>`, is idempotent (not an error if already unlocked), and errors `ERROR: unknown environment <env>` for unknown env.",
+    "`lock --list` prints currently locked environments alphabetically as `<env>: <reason> (locked since <ISO8601_timestamp>)` and prints nothing if none are locked.",
+    "Lock state persists across command invocations via filesystem storage.",
+    "When an environment is locked, `deploy`, `promote` (when target env is locked), `rollback`, and `restore` must fail with `ERROR: <env> is locked (<reason>)` and make no state changes.",
+    "Read-only commands (`status`, `diff`, `history`, `snapshot`, `validate`, `order`, `build`, `test`, `graph`, `bump`, `lock`, `unlock`) continue to work on locked environments.",
+    "`status <env>` detail view includes `[LOCKED: <reason>]` at the top before service listings when locked, and adds nothing when unlocked.",
+    "`lock` writes a LOCK event to the environment's JSONL event log with timestamp, iso_timestamp, action LOCK, service `-`, version `-`, and reason.",
+    "`unlock` writes an UNLOCK event to the environment's JSONL event log with timestamp, iso_timestamp, action UNLOCK, service `-`, version `-`.",
+    "`history <env>` displays LOCK events as `<iso_timestamp> LOCK <reason>` and UNLOCK events as `<iso_timestamp> UNLOCK`, interleaved chronologically with DEPLOY/ROLLBACK/PROMOTE/RESTORE events."
+   ],
+   "affected_prior": [
+    "deploy",
+    "promote",
+    "rollback",
+    "restore",
+    "status",
+    "history"
+   ],
+   "summary": "Add persistent environment locking with lock/unlock/list commands, enforce lock blocks on destructive operations, and integrate lock status and audit events into status and history."
+  },
+  "instruction_head": "Add environment locking to the pipeline orchestrator. Locking prevents destructive operations on an environment while allowing read-only queries to continue.\n\n**`pipeline.sh lock <environment> [--reason REASON]`** \u2014 Lock an environment. Output: `LOCKED <env>: <reason>` (default reason is `manual lock` if not specified). Locking an already-locked environment updates the reason and prints the same output (idempotent). Error if the environment doesn't exist in the manifest: `ERROR: unknown environm"
+ },
+ {
+  "round": 6,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "pipeline.sh",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "pipeline.sh"
+   ],
+   "target_symbols": [
+    "config",
+    "config_set",
+    "config_get",
+    "config_list",
+    "config_diff",
+    "config_delete",
+    "config_export",
+    "config_import"
+   ],
+   "behavior_constraints": [
+    "config set <env> <KEY> <VALUE> writes CONFIG <env>: <KEY>=<VALUE>, validates env existence and key pattern ^[A-Za-z_][A-Za-z0-9_]*$, enforces lock, records CONFIG_SET event, idempotent on existing key",
+    "config get <env> <KEY> prints only the value; errors ERROR: key '<KEY>' not found in <env> or ERROR: unknown environment '<env>'",
+    "config list <env> prints KEY=VALUE lines sorted alphabetically, nothing if empty; errors on unknown env",
+    "config diff <env1> <env2> prints sorted lines with + (only env1), - (only env2), ~ (changed value env1->env2); silent on identical; errors if either env unknown",
+    "config delete <env> <KEY> prints CONFIG <env>: deleted <KEY>, errors if key/env missing, enforces lock, records CONFIG_DELETE event",
+    "config export <env> prints single-line JSON object with alphabetically sorted keys, {} if empty; errors on unknown env",
+    "config import <env> reads JSON object from stdin, validates ALL keys before writing any (reject entire import with ERROR: invalid key '<KEY>' on any bad key), merges into config, prints one CONFIG line per key sorted alphabetically, enforces lock, emits CONFIG_SET event per imported key",
+    "key validation pattern ^[A-Za-z_][A-Za-z0-9_]*$ applied before any other checks including lock checks for set/delete/import",
+    "lock enforcement blocks set/delete/import with ERROR: <env> is locked (<reason>); get/list/diff/export are read-only and allowed on locked envs",
+    "CONFIG_SET history event JSON includes timestamp, iso_timestamp, action=CONFIG_SET, service='-', version='-', key, value; display: <iso_timestamp> CONFIG_SET <KEY>=<VALUE>"
+   ],
+   "affected_prior": [
+    "status",
+    "history"
+   ],
+   "summary": "Add a config command with set/get/list/diff/delete/export/import subcommands for per-environment key-value variable management, including key validation, lock enforcement on mutating ops, CONFIG_SET/CONFIG_DELETE history events, and a config count line in status output."
+  },
+  "instruction_head": "Add per-environment configuration variable management to the pipeline orchestrator. Config variables are key-value pairs stored per environment that can be set, queried, listed, and compared.\n\n**`pipeline.sh config set <environment> <KEY> <VALUE>`** \u2014 Set a configuration variable for an environment. Keys are case-sensitive strings (alphanumeric and underscores only). Values are arbitrary strings. Output: `CONFIG <env>: <KEY>=<VALUE>`. Setting an existing key updates its value (idempotent). Error"
+ },
+ {
+  "round": 7,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "pipeline.sh",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "pipeline.sh"
+   ],
+   "target_symbols": [
+    "scale",
+    "scale_set",
+    "scale_get",
+    "scale_list",
+    "scale_all",
+    "scale_set_bounds",
+    "scale_get_bounds",
+    "deploy",
+    "rollback",
+    "promote",
+    "status",
+    "history"
+   ],
+   "behavior_constraints": [
+    "scale <env> <service> <count> sets replicas; validates in order: env exists \u2192 service exists \u2192 valid positive integer \u2192 deployed \u2192 env max_replicas \u2192 service bounds; prints SCALED <env>/<service> to <count> replicas (was <previous>)",
+    "scale <env> <service> <count> errors: unknown environment '<env>', unknown service '<service>', invalid replica count '<count>', <service> is not deployed to <env>, <count> exceeds max_replicas (<max>) for <env>, <count> violates bounds [<min>..<max>] for <service> in <env>",
+    "scale <env> <service> (no count) prints '<service>: <count> replicas' with default 1 for deployed-but-never-scaled services; errors '<service> is not deployed to <env>' if not deployed",
+    "scale <env> lists all deployed services alphabetically as '<service>: <count> replicas'; prints nothing if none deployed; errors 'unknown environment <env>' if env missing",
+    "scale <env> --all <count> validates all deployed services first; reports first alphabetical bounds violation as 'ERROR: <count> violates bounds [<min>..<max>] for <service> in <env>'; on success prints SCALED line per service alphabetically then 'Scaled <N> services to <count> replicas'; writes SCALE event per service; errors 'ERROR: no services deployed in <env>' if none; lock-enforced",
+    "scale <env> <service> --bounds <min> <max> requires min>=1, max>=min, max<=env max_replicas; prints 'BOUNDS <env>/<service> set to [<min>..<max>]'; auto-adjusts current replicas outside new bounds and prints 'SCALED <env>/<service> to <adjusted> replicas (was <previous>)' plus SCALE event; errors 'invalid bounds: min must be >= 1', 'invalid bounds: max must be >= min', 'invalid bounds: max (<max>) exceeds max_replicas (<env_max>) for <env>'; lock-enforced",
+    "scale <env> <service> --bounds (read) prints '<service>: bounds [<min>..<max>]' or '<service>: no bounds set'; service must be deployed",
+    "write operations (scale set, --all, --bounds set) are blocked on locked environments; read operations (list, get, get-bounds) work on locked environments",
+    "each SCALE event is JSON: {timestamp, iso_timestamp, action:'SCALE', service, version:'-', replicas, previous}; history displays '<iso_timestamp> SCALE <service> from <previous> to <count> replicas'",
+    "status <env> detail line shows '<service>: <version> (deployed at <timestamp>) [<count> replicas]' with default 1 for never-scaled services"
+   ],
+   "affected_prior": [
+    "deploy",
+    "rollback",
+    "promote",
+    "status",
+    "history",
+    "lock"
+   ],
+   "summary": "Add a scale command (set/get/list/all/bounds) with persistent replica and bounds state, SCALE event logging, status integration showing replica counts, and deploy/rollback/promote interactions that reset replicas to 1 while preserving bounds."
+  },
+  "instruction_head": "Add service replica scaling to the pipeline orchestrator. Replicas represent the number of instances running for each service in each environment.\n\n**`pipeline.sh scale <environment> <service> <count>`** \u2014 Set the replica count for a service in an environment. Count must be a positive integer (>= 1). Output: `SCALED <env>/<service> to <count> replicas (was <previous>)`. Error if count exceeds the environment's `max_replicas` from the manifest: `ERROR: <count> exceeds max_replicas (<max>) for <en"
+ },
+ {
+  "round": 8,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "pipeline.sh",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "pipeline.sh"
+   ],
+   "target_symbols": [
+    "health",
+    "health_set",
+    "health_get",
+    "health_list",
+    "deploy",
+    "rollback",
+    "promote",
+    "status",
+    "history",
+    "scale_set",
+    "scale_all"
+   ],
+   "behavior_constraints": [
+    "Add a `health` command supporting `health <env> <service> set <state>`, `health <env> <service>`, `health <env>`, and `health <env> --filter <state>`.",
+    "Valid health states are healthy, unhealthy, degraded; default health for any deployed service is healthy.",
+    "For set, validation order is env exists, service exists, valid state, service deployed; output is `HEALTH <env>/<service> set to <state> (was <previous_state>)`.",
+    "Invalid state error is `ERROR: invalid health state '<state>' (must be healthy, unhealthy, or degraded)`; unknown env/service and not-deployed errors follow the specified messages.",
+    "Get health outputs `<service>: <state>`; list outputs all deployed services sorted alphabetically as `<service>: <state>`; if none deployed or none match, print nothing.",
+    "`--filter <state>` validates the filter value and lists only matching services sorted alphabetically.",
+    "Health state is persisted in `/app/.pipeline/health/<environment>.json` with entries containing `state` and `state_snapshot`.",
+    "Reading health returns healthy when no state is stored or when the stored `state_snapshot` no longer matches the current deployment state.",
+    "Lock enforcement blocks `health set` mutations but allows health get/list/filter reads on locked environments.",
+    "Each health set appends a HEALTH history event with action HEALTH, version `-`, state, and previous_state; history display is `<iso_timestamp> HEALTH <service> <previous_state> -> <new_state>`."
+   ],
+   "affected_prior": [
+    "deploy",
+    "rollback",
+    "promote",
+    "status",
+    "history",
+    "scale_set",
+    "scale_all"
+   ],
+   "summary": "Add per-service health state tracking with health set/get/list/filter commands, persistent state snapshots, lock/history/status integration, and deploy/rollback/promote/scale interactions including unhealthy restrictions."
+  },
+  "instruction_head": "Add service health tracking to the pipeline orchestrator. Each deployed service has a health state that can be healthy, unhealthy, or degraded.\n\n**`pipeline.sh health <environment> <service> set <state>`** \u2014 Set the health state for a deployed service. State must be one of: `healthy`, `unhealthy`, `degraded`. Output: `HEALTH <env>/<service> set to <state> (was <previous_state>)`. Default health state for any deployed service is `healthy`. Error if state is invalid: `ERROR: invalid health state '"
+ },
+ {
+  "round": 9,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "pipeline.sh",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "pipeline.sh"
+   ],
+   "target_symbols": [
+    "quota",
+    "quota_set",
+    "quota_get",
+    "quota_list",
+    "quota_remove",
+    "quota_check",
+    "deploy",
+    "scale_set",
+    "scale_all",
+    "status",
+    "history"
+   ],
+   "behavior_constraints": [
+    "Quota state is persisted in /app/.pipeline/quotas/<environment>.json as a JSON object mapping resource names to integer limits.",
+    "Supported quota resources are only max_services and max_total_replicas; unsupported resource outputs: ERROR: unknown quota resource '<resource>' (must be max_services or max_total_replicas).",
+    "quota <env> set <resource> <limit> validates in order: environment exists (ERROR: unknown environment '<env>'), resource supported, then limit is a positive integer >=1 (ERROR: invalid quota limit '<limit>'); on success prints QUOTA <env>: <resource>=<limit>, creates/updates the quota, and logs QUOTA_SET.",
+    "quota <env> get <resource> prints <resource>: <limit> (current: <usage>) when set, or <resource>: not set (current: <usage>) when unset; errors on unknown environment or unsupported resource; usage for max_services is the count of currently deployed services, and for max_total_replicas is the sum of all service replica counts defaulting to 1 per service if not explicitly scaled.",
+    "quota <env> list prints only explicitly set quotas, one per line as <resource>: <limit> (current: <usage>), and prints nothing when no quotas are set; errors on unknown environment.",
+    "quota <env> remove <resource> validates env/resource (same errors as set), errors if not set (ERROR: quota '<resource>' not set in <env>), otherwise prints QUOTA <env>: removed <resource>, removes the quota, and logs QUOTA_REMOVE.",
+    "quota <env> --check prints <resource>: OK (<usage>/<limit>) or <resource>: EXCEEDED (<usage>/<limit>) for each set quota, then All quotas OK if none exceeded or <N> quota(s) exceeded if any are exceeded; errors on unknown environment.",
+    "quota set and quota remove are blocked on locked environments; quota get, quota list, and quota --check work on locked environments.",
+    "When max_services is set, deploying a new service (not already deployed) checks after the lock check and before deployment; if current deployed service count + 1 would exceed the limit, it errors ERROR: deploying <service> would exceed max_services quota (<current+1>/<limit>) in <env>; redeploying an existing service is not checked, and each new service in a dependency deploy loop is checked individually.",
+    "When max_total_replicas is set, scale set checks after the health check and before updating replicas; projected total = current total replicas - service current count + new count; if exceeded, errors ERROR: scaling <service> to <count> would exceed max_total_replicas quota (<projected>/<limit>) in <env>."
+   ],
+   "affected_prior": [
+    "deploy",
+    "scale_set",
+    "scale_all",
+    "status",
+    "history",
+    "lock enforcement"
+   ],
+   "summary": "Add environment resource quotas for max_services and max_total_replicas with quota set/get/list/remove/--check, persistent quota state, lock enforcement on writes, deploy and scale enforcement, history events, and status integration."
+  },
+  "instruction_head": "Add resource quotas to the pipeline orchestrator. Quotas allow setting environment-level limits on the number of services and total replicas.\n\n**`pipeline.sh quota <environment> set <resource> <limit>`** \u2014 Set a resource quota for an environment. Supported resources: `max_services` (maximum number of deployed services) and `max_total_replicas` (maximum sum of all service replica counts). Limit must be a positive integer (>= 1). Output: `QUOTA <env>: <resource>=<limit>`. Error if resource is unsu"
+ },
+ {
+  "round": 10,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "pipeline.sh",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "pipeline.sh"
+   ],
+   "target_symbols": [
+    "clone",
+    "history",
+    "status"
+   ],
+   "behavior_constraints": [
+    "Implements: pipeline.sh clone <source_env> <target_env_name> [--max-replicas N].",
+    "Validation order: source exists -> target does not exist in manifest or state -> source not locked -> max-replicas valid.",
+    "Errors exact: ERROR: unknown environment '<source_env>'; ERROR: environment '<target_env_name>' already exists; ERROR: <source_env> is locked (<reason>); ERROR: invalid max-replicas '<value>'.",
+    "--max-replicas must be a positive integer >= 1; if omitted, source max_replicas is used.",
+    "Adds target to pipeline.yaml environments with deploy_target '/deployments/<target_env_name>', health_check_port copied from source, and max_replicas from flag or source.",
+    "Copies deployed services with versions/timestamps, replica counts, service-level replica bounds, health states including health state snapshots, config variables, and quotas from source to target.",
+    "Does not copy locks, event history, or snapshot/restore snapshots; target starts unlocked, with only a CLONE event in its history, and with no snapshots.",
+    "Source environment history is not modified.",
+    "Success output exact: CLONE <source_env> -> <target_env_name> (<N> services), where N is the number of deployed services copied (0 if none).",
+    "Appends a CLONE event only to target history with JSON fields timestamp, iso_timestamp, action=CLONE, service='-', version='-', source='<source_env>'."
+   ],
+   "affected_prior": [
+    "main dispatch",
+    "manifest/environment registration",
+    "ensure_state",
+    "lock",
+    "deploy",
+    "scale",
+    "health",
+    "config",
+    "quota"
+   ],
+   "summary": "Add a clone command that creates a new environment by copying the source's deployments, replicas, bounds, health, config, and quotas while leaving locks, history, and snapshots fresh."
+  },
+  "instruction_head": "Add environment cloning to the pipeline orchestrator. Cloning creates a new environment by copying the full operational state from an existing source environment.\n\n**`pipeline.sh clone <source_env> <target_env_name> [--max-replicas N]`** \u2014 Clone a source environment into a new target environment. The target environment must not already exist (in the manifest or in state). The source environment must exist. The source environment must not be locked. Output on success: `CLONE <source_env> -> <targ"
+ },
+ {
+  "round": 11,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "pipeline.sh",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "pipeline.sh"
+   ],
+   "target_symbols": [
+    "audit",
+    "main"
+   ],
+   "behavior_constraints": [
+    "audit <environment> generates a read-only audit report with header, seven sections, and footer in exact order",
+    "deployment summary lists deployed services alphabetically with full version and deployment ISO timestamp, or (no services deployed)",
+    "replica summary lists deployed services alphabetically with explicit replica count or default 1, or (no services deployed)",
+    "health summary lists deployed services alphabetically with explicit state or default healthy, or (no services deployed)",
+    "quota status lists quotas alphabetically with limit, current usage, and OK or EXCEEDED, or (no quotas set)",
+    "config variables list only key names alphabetically, or (no config variables)",
+    "lock status prints Locked: <reason> or Unlocked",
+    "recent activity shows last 10 events newest first in history display format, or (no events)",
+    "audit works on locked environments and generates no events",
+    "unknown environment errors with ERROR: unknown environment '<environment>'"
+   ],
+   "affected_prior": [
+    "main",
+    "status",
+    "history"
+   ],
+   "summary": "This round adds a read-only audit command that aggregates deployment, replicas, health, quotas, config, lock, and recent activity into a human-readable or JSON report for an environment."
+  },
+  "instruction_head": "Add an audit report command to the pipeline orchestrator. The audit command generates a comprehensive compliance report for an environment, aggregating deployment state, replicas, health, quotas, config, lock status, and recent activity into a single read-only view.\n\n**`pipeline.sh audit <environment>`** \u2014 Generate a full audit report for the given environment. The report is entirely read-only: it works on locked environments and does NOT generate any events. Error if the environment doesn't exi"
+ }
+]

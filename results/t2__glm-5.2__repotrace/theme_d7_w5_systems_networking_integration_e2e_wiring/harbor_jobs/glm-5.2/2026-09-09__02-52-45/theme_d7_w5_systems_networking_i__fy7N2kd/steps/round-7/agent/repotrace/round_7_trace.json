@@ -1,0 +1,127 @@
+{
+ "round": 7,
+ "root": "/app",
+ "graph": {
+  "n_files": 14,
+  "n_edges": 59,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "internal/circuit/breaker.go",
+    "pagerank": 0.144374,
+    "fan_in": 8,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/health/monitor.go",
+    "pagerank": 0.128373,
+    "fan_in": 5,
+    "fan_out": 9
+   },
+   {
+    "file": "internal/state/state.go",
+    "pagerank": 0.093071,
+    "fan_in": 6,
+    "fan_out": 5
+   },
+   {
+    "file": "internal/accesslog/logger.go",
+    "pagerank": 0.084497,
+    "fan_in": 6,
+    "fan_out": 1
+   },
+   {
+    "file": "internal/state/ratelimit.go",
+    "pagerank": 0.069688,
+    "fan_in": 5,
+    "fan_out": 4
+   },
+   {
+    "file": "internal/stats/stats.go",
+    "pagerank": 0.069011,
+    "fan_in": 5,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/state/routing.go",
+    "pagerank": 0.065313,
+    "fan_in": 5,
+    "fan_out": 2
+   },
+   {
+    "file": "internal/config/config.go",
+    "pagerank": 0.064308,
+    "fan_in": 4,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/ipc/server.go",
+    "pagerank": 0.063749,
+    "fan_in": 4,
+    "fan_out": 11
+   },
+   {
+    "file": "internal/router/router.go",
+    "pagerank": 0.063295,
+    "fan_in": 4,
+    "fan_out": 10
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "internal/config/config.go",
+   "internal/state/state.go",
+   "internal/state/json.go",
+   "internal/router/router.go",
+   "internal/accesslog/logger.go",
+   "internal/stats/stats.go",
+   "internal/ipc/server.go",
+   "cmd/meshctl/main.go"
+  ],
+  "target_symbols": [
+   "ServiceConfig",
+   "ApplyConfig",
+   "applyConfigLocked",
+   "forward",
+   "Log",
+   "RecordRejection",
+   "Snapshot",
+   "StatsView",
+   "dispatch",
+   "handleLine",
+   "main",
+   "prettyData"
+  ],
+  "behavior_constraints": [
+   "ServiceConfig gains a DependsOn []string field (TOML key depends_on), default empty array",
+   "api-gateway service config must set depends_on = [\"data-store\"]; data-store and cache-layer have no dependencies",
+   "Before accepting any new connection and before rate-limit check, every service in depends_on must have at least one healthy endpoint with circuit breaker closed",
+   "If a dependency check fails, the connection is rejected immediately with access log result \"rejected_dependency\"",
+   "Access log entries for rejected_dependency must include a failed_dependency field naming the first unavailable dependency service",
+   "A new per-service stat dependency_rejections counts dependency rejections and appears in stats output",
+   "New IPC command get_dependencies accepts {\"name\":\"<service>\"} and returns service name plus a dependencies array with name, available (bool), and healthy_endpoints (int) per dependency",
+   "New CLI subcommand meshctl deps [service] prints a table with columns SERVICE, DEPENDS_ON, AVAILABLE, HEALTHY_ENDPOINTS",
+   "When no service argument is given to meshctl deps, show all services that have at least one dependency configured",
+   "At initial config load and on SIGHUP reload, circular dependencies are detected; if a cycle is found a warning is logged and the edge that closes the cycle is dropped"
+  ],
+  "affected_prior": [
+   "internal/config/config.go (ServiceConfig struct from round 1)",
+   "internal/state/state.go (ApplyConfig/applyConfigLocked from rounds 1/4)",
+   "internal/router/router.go (forward/connection acceptance from rounds 1/5)",
+   "internal/accesslog/logger.go (Log entry format from rounds 5/6)",
+   "internal/stats/stats.go (per-service stats from rounds 2/6)",
+   "internal/ipc/server.go (dispatch command table from rounds 1/5)",
+   "cmd/meshctl/main.go (CLI subcommands from rounds 1/5)",
+   "internal/state/json.go (StatsView and dependency view from rounds 1/4)"
+  ],
+  "summary": "This round adds per-service dependency health checking so connections are rejected when a depended-on service has no healthy circuit-closed endpoint, with a new rejected_dependency access log result, dependency_rejections stat, get_dependencies IPC command, meshctl deps CLI subcommand, and circular-dependency detection at config load and reload."
+ },
+ "instruction_head": "Now add service dependency health checking to meshrouter.\n\nAdd a `depends_on` field to each service block in the config (array of service names, default empty). For example, setting `depends_on = [\"data-store\"]` on api-gateway means api-gateway requires data-store to be available before accepting connections.\n\nUpdate the existing `api-gateway` service config to set `depends_on = [\"data-store\"]`. Leave `data-store` and `cache-layer` with no dependencies by default.\n\nBefore accepting any new conne"
+}

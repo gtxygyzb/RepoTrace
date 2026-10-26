@@ -1,0 +1,747 @@
+[
+ {
+  "round": 1,
+  "root": "/app",
+  "graph": {
+   "n_files": 0,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": []
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/meshd/main.go",
+    "cmd/meshctl/main.go",
+    "internal/config/config.go",
+    "internal/health/monitor.go",
+    "internal/circuit/breaker.go",
+    "internal/router/router.go",
+    "internal/ipc/server.go",
+    "internal/stats/stats.go",
+    "internal/state/state.go",
+    "go.mod"
+   ],
+   "target_symbols": [
+    "Config",
+    "ServiceConfig",
+    "EndpointConfig",
+    "HealthMonitor",
+    "CircuitBreaker",
+    "Router",
+    "Proxy",
+    "IPCServer",
+    "StatsCollector",
+    "list_services",
+    "get_service",
+    "get_stats",
+    "set_weight",
+    "drain_endpoint",
+    "reset_circuit_breaker",
+    "LoadConfig",
+    "ReloadConfig",
+    "weightedRoundRobin",
+    "leastConnections",
+    "tcpHealthCheck"
+   ],
+   "behavior_constraints": [
+    "Config is loaded from /app/config/services.toml in TOML format with global settings and per-service endpoints",
+    "TCP health check succeeds if connection establishes within 1 second",
+    "HTTP health check sends GET to http://<address><health_path>, succeeds only if status 200 and body contains 'ok' case-insensitively, 2s timeout",
+    "Exec health check runs health_cmd via shell, succeeds if exit code 0, 3s timeout",
+    "Endpoints start as 'unknown'; healthy_threshold consecutive successes transition to 'healthy'",
+    "unhealthy_threshold consecutive failures transition a 'healthy' endpoint to 'unhealthy'; counters reset on transitions",
+    "Circuit breaker opens immediately when health transitions healthy->unhealthy",
+    "Circuit transitions open->half_open after circuit_breaker_timeout_ms elapsed while open",
+    "half_open allows at most one probe connection; success closes circuit, failure reopens with restarted timeout",
+    "Health recovery to 'healthy' while circuit is 'open' does NOT close the circuit"
+   ],
+   "affected_prior": [],
+   "summary": "Build a complete Go service mesh system (meshd daemon, TCP router/proxy, and CLI) sharing state over a Unix-socket JSON IPC protocol, with TOML config, threshold-based health checks (tcp/http/exec), per-endpoint circuit breakers, connection limits, weighted/least-conn routing, draining, stats, and SIGHUP live reload."
+  },
+  "instruction_head": "# Service Mesh Health Router\n\nBuild a service mesh health monitoring and traffic routing system in Go. The system consists of three integrated components that must work together end-to-end: a **health monitor daemon**, a **traffic router/proxy**, and a **CLI control tool**. All three share state through a local Unix domain socket protocol.\n\n## System Overview\n\nThe system manages a set of backend services defined in a TOML configuration file at `/app/config/services.toml`. Each service has multip"
+ },
+ {
+  "round": 2,
+  "root": "/app",
+  "graph": {
+   "n_files": 11,
+   "n_edges": 37,
+   "delta": {
+    "files_added": [
+     "cmd/meshctl/main.go",
+     "cmd/meshd/main.go",
+     "internal/circuit/breaker.go",
+     "internal/config/config.go",
+     "internal/health/monitor.go",
+     "internal/ipc/server.go",
+     "internal/router/router.go",
+     "internal/state/json.go",
+     "internal/state/routing.go",
+     "internal/state/state.go",
+     "internal/stats/stats.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "cmd/meshd/main.go",
+      "internal/config/config.go"
+     ],
+     [
+      "cmd/meshd/main.go",
+      "internal/health/monitor.go"
+     ],
+     [
+      "cmd/meshd/main.go",
+      "internal/ipc/server.go"
+     ],
+     [
+      "cmd/meshd/main.go",
+      "internal/router/router.go"
+     ],
+     [
+      "cmd/meshd/main.go",
+      "internal/state/json.go"
+     ],
+     [
+      "cmd/meshd/main.go",
+      "internal/state/routing.go"
+     ],
+     [
+      "cmd/meshd/main.go",
+      "internal/state/state.go"
+     ],
+     [
+      "internal/health/monitor.go",
+      "internal/circuit/breaker.go"
+     ],
+     [
+      "internal/health/monitor.go",
+      "internal/config/config.go"
+     ],
+     [
+      "internal/health/monitor.go",
+      "internal/ipc/server.go"
+     ],
+     [
+      "internal/health/monitor.go",
+      "internal/router/router.go"
+     ],
+     [
+      "internal/health/monitor.go",
+      "internal/state/json.go"
+     ],
+     [
+      "internal/health/monitor.go",
+      "internal/state/routing.go"
+     ],
+     [
+      "internal/health/monitor.go",
+      "internal/state/state.go"
+     ],
+     [
+      "internal/ipc/server.go",
+      "internal/circuit/breaker.go"
+     ],
+     [
+      "internal/ipc/server.go",
+      "internal/config/config.go"
+     ],
+     [
+      "internal/ipc/server.go",
+      "internal/health/monitor.go"
+     ],
+     [
+      "internal/ipc/server.go",
+      "internal/router/router.go"
+     ],
+     [
+      "internal/ipc/server.go",
+      "internal/state/json.go"
+     ],
+     [
+      "internal/ipc/server.go",
+      "internal/state/routing.go"
+     ],
+     [
+      "internal/ipc/server.go",
+      "internal/state/state.go"
+     ],
+     [
+      "internal/ipc/server.go",
+      "internal/stats/stats.go"
+     ],
+     [
+      "internal/router/router.go",
+      "internal/circuit/breaker.go"
+     ],
+     [
+      "internal/router/router.go",
+      "internal/ipc/server.go"
+     ],
+     [
+      "internal/router/router.go",
+      "internal/state/json.go"
+     ],
+     [
+      "internal/router/router.go",
+      "internal/state/routing.go"
+     ],
+     [
+      "internal/router/router.go",
+      "internal/state/state.go"
+     ],
+     [
+      "internal/router/router.go",
+      "internal/stats/stats.go"
+     ],
+     [
+      "internal/state/json.go",
+      "internal/circuit/breaker.go"
+     ],
+     [
+      "internal/state/json.go",
+      "internal/state/routing.go"
+     ],
+     [
+      "internal/state/json.go",
+      "internal/state/state.go"
+     ],
+     [
+      "internal/state/json.go",
+      "internal/stats/stats.go"
+     ],
+     [
+      "internal/state/routing.go",
+      "internal/circuit/breaker.go"
+     ],
+     [
+      "internal/state/routing.go",
+      "internal/state/state.go"
+     ],
+     [
+      "internal/state/state.go",
+      "internal/circuit/breaker.go"
+     ],
+     [
+      "internal/state/state.go",
+      "internal/config/config.go"
+     ],
+     [
+      "internal/state/state.go",
+      "internal/stats/stats.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/circuit/breaker.go",
+     "pagerank": 0.1679,
+     "fan_in": 6,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/state/state.go",
+     "pagerank": 0.13536,
+     "fan_in": 6,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/stats/stats.go",
+     "pagerank": 0.1201,
+     "fan_in": 4,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/config/config.go",
+     "pagerank": 0.106972,
+     "fan_in": 4,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/state/routing.go",
+     "pagerank": 0.094989,
+     "fan_in": 5,
+     "fan_out": 2
+    },
+    {
+     "file": "internal/state/json.go",
+     "pagerank": 0.078342,
+     "fan_in": 4,
+     "fan_out": 4
+    },
+    {
+     "file": "internal/ipc/server.go",
+     "pagerank": 0.070817,
+     "fan_in": 3,
+     "fan_out": 8
+    },
+    {
+     "file": "internal/router/router.go",
+     "pagerank": 0.06862,
+     "fan_in": 3,
+     "fan_out": 6
+    },
+    {
+     "file": "internal/health/monitor.go",
+     "pagerank": 0.06119,
+     "fan_in": 2,
+     "fan_out": 7
+    },
+    {
+     "file": "cmd/meshctl/main.go",
+     "pagerank": 0.047855,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "internal/config/config.go",
+    "internal/state/state.go",
+    "internal/state/routing.go",
+    "internal/state/json.go",
+    "internal/router/router.go",
+    "internal/ipc/server.go",
+    "internal/stats/stats.go",
+    "cmd/meshctl/main.go"
+   ],
+   "target_symbols": [
+    "ServiceConfig",
+    "RateLimitRPS",
+    "RateLimitBurst",
+    "RateLimitQueueDepth",
+    "RateLimitQueueTimeoutMs",
+    "MaxRetries",
+    "RetryDelayMs",
+    "RetryBackoffMultiplier",
+    "RetryMaxDelayMs",
+    "TokenBucket",
+    "AcquireToken",
+    "SetRateLimit",
+    "GetRateLimitStatus",
+    "ApplyConfig",
+    "applyConfigLocked",
+    "newServiceState",
+    "SelectEndpoint",
+    "forward",
+    "startService",
+    "dispatch"
+   ],
+   "behavior_constraints": [
+    "Token bucket uses lazy continuous refill: tokens = min(burst, tokens + rps * elapsed_seconds) with no background refill goroutine",
+    "rate_limit_burst is independently configurable from rate_limit_rps (e.g., rps=2, burst=8)",
+    "Rate limiting is applied before endpoint selection",
+    "A rate-limited rejection must NOT count as a failure toward any endpoint's circuit breaker",
+    "rate_limited counter increments on immediate no-token rejections and queue-full rejections",
+    "queue_timeouts counter increments when a queued connection exceeds rate_limit_queue_timeout_ms",
+    "When rate_limit_queue_depth > 0 and queue not full, connection waits up to rate_limit_queue_timeout_ms for a token",
+    "When rate limit parameters change via set_rate_limit or reload, current token count is preserved but capped to the new burst",
+    "Retry selects a different endpoint, never the same one consecutively",
+    "Retry delay = retry_delay_ms * retry_backoff_multiplier^(attempt-1), capped at retry_max_delay_ms, and is a real wait"
+   ],
+   "affected_prior": [
+    "internal/config/config.go (ServiceConfig struct)",
+    "internal/state/state.go (ApplyConfig, applyConfigLocked, newServiceState)",
+    "internal/state/routing.go (SelectEndpoint \u2014 rate limit gate before selection)",
+    "internal/router/router.go (forward, startService \u2014 retry loop and rate limit hook)",
+    "internal/ipc/server.go (dispatch, handleLine \u2014 new commands)",
+    "internal/stats/stats.go (Snapshot, RecordRejection \u2014 new counters)",
+    "internal/state/json.go (StatsView, ServicesView \u2014 expose new fields)",
+    "cmd/meshctl/main.go (CLI subcommands)",
+    "internal/circuit/breaker.go (failure tracking interaction with retry)"
+   ],
+   "summary": "This round adds per-service token-bucket rate limiting with queueing, automatic retry with exponential backoff on dial failures, new rate-limit/retry stats, and corresponding IPC and CLI commands, all reloadable via SIGHUP."
+  },
+  "instruction_head": "# Per-Service Rate Limiting and Connection Retry\n\nAdd per-service rate limiting using a token bucket algorithm and automatic connection retry with exponential backoff to the mesh router.\n\n## Rate Limiting\n\nEach service gets a configurable token bucket rate limiter applied before endpoint selection. New config fields on each `[[service]]`:\n\n- `rate_limit_rps` (int) \u2014 tokens per second; 0 means unlimited (default)\n- `rate_limit_burst` (int) \u2014 max bucket size; defaults to `rate_limit_rps` if omitte"
+ },
+ {
+  "round": 3,
+  "root": "/app",
+  "graph": {
+   "n_files": 12,
+   "n_edges": 45,
+   "delta": {
+    "files_added": [
+     "internal/state/ratelimit.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "cmd/meshd/main.go",
+      "internal/state/ratelimit.go"
+     ],
+     [
+      "internal/health/monitor.go",
+      "internal/state/ratelimit.go"
+     ],
+     [
+      "internal/ipc/server.go",
+      "internal/state/ratelimit.go"
+     ],
+     [
+      "internal/router/router.go",
+      "internal/state/ratelimit.go"
+     ],
+     [
+      "internal/state/ratelimit.go",
+      "internal/health/monitor.go"
+     ],
+     [
+      "internal/state/ratelimit.go",
+      "internal/ipc/server.go"
+     ],
+     [
+      "internal/state/ratelimit.go",
+      "internal/router/router.go"
+     ],
+     [
+      "internal/state/state.go",
+      "internal/state/ratelimit.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/circuit/breaker.go",
+     "pagerank": 0.138607,
+     "fan_in": 6,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/state/state.go",
+     "pagerank": 0.117611,
+     "fan_in": 6,
+     "fan_out": 4
+    },
+    {
+     "file": "internal/stats/stats.go",
+     "pagerank": 0.095442,
+     "fan_in": 4,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/state/ratelimit.go",
+     "pagerank": 0.093061,
+     "fan_in": 5,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/ipc/server.go",
+     "pagerank": 0.086287,
+     "fan_in": 4,
+     "fan_out": 9
+    },
+    {
+     "file": "internal/router/router.go",
+     "pagerank": 0.084211,
+     "fan_in": 4,
+     "fan_out": 7
+    },
+    {
+     "file": "internal/config/config.go",
+     "pagerank": 0.082836,
+     "fan_in": 4,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/state/routing.go",
+     "pagerank": 0.082534,
+     "fan_in": 5,
+     "fan_out": 2
+    },
+    {
+     "file": "internal/health/monitor.go",
+     "pagerank": 0.076123,
+     "fan_in": 3,
+     "fan_out": 8
+    },
+    {
+     "file": "internal/state/json.go",
+     "pagerank": 0.068069,
+     "fan_in": 4,
+     "fan_out": 4
+    }
+   ]
+  },
+  "entities": {
+   "source": "fallback",
+   "target_files": [],
+   "target_symbols": [
+    "status"
+   ],
+   "behavior_constraints": [],
+   "affected_prior": [],
+   "summary": "Update the mesh router to fix least-connections tie-breaking and add per-service connection idle timeouts."
+  },
+  "instruction_head": "Update the mesh router to fix least-connections tie-breaking and add per-service connection idle timeouts.\n\n**Least-connections tie-breaking**\n\nThe current tie-breaking in least-connections routing is wrong. When multiple endpoints share the same active-connection count, they should be preferred by weight (higher weight wins), not just by address order. Keep lexicographic address as the secondary tie-breaker (i.e., weight first, then address). Update the selection logic accordingly.\n\n**Per-servi"
+ },
+ {
+  "round": 4,
+  "root": "/app",
+  "graph": {
+   "n_files": 12,
+   "n_edges": 46,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "internal/router/router.go",
+      "internal/health/monitor.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/circuit/breaker.go",
+     "pagerank": 0.137102,
+     "fan_in": 6,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/state/state.go",
+     "pagerank": 0.116348,
+     "fan_in": 6,
+     "fan_out": 4
+    },
+    {
+     "file": "internal/stats/stats.go",
+     "pagerank": 0.093429,
+     "fan_in": 4,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/state/ratelimit.go",
+     "pagerank": 0.092062,
+     "fan_in": 5,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/ipc/server.go",
+     "pagerank": 0.085361,
+     "fan_in": 4,
+     "fan_out": 9
+    },
+    {
+     "file": "internal/health/monitor.go",
+     "pagerank": 0.08445,
+     "fan_in": 4,
+     "fan_out": 8
+    },
+    {
+     "file": "internal/router/router.go",
+     "pagerank": 0.08445,
+     "fan_in": 4,
+     "fan_out": 8
+    },
+    {
+     "file": "internal/config/config.go",
+     "pagerank": 0.083089,
+     "fan_in": 4,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/state/routing.go",
+     "pagerank": 0.081648,
+     "fan_in": 5,
+     "fan_out": 2
+    },
+    {
+     "file": "internal/state/json.go",
+     "pagerank": 0.067338,
+     "fan_in": 4,
+     "fan_out": 4
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "internal/config/config.go",
+    "internal/state/state.go",
+    "internal/state/routing.go",
+    "internal/state/json.go",
+    "internal/ipc/server.go",
+    "cmd/meshctl/main.go"
+   ],
+   "target_symbols": [
+    "ServiceConfig",
+    "EndpointConfig",
+    "ApplyConfig",
+    "applyConfigLocked",
+    "newEndpointState",
+    "TryAddConnection",
+    "RecordHealthCheck",
+    "ResetCircuitBreaker",
+    "selectWeighted",
+    "selectWeightedCandidate",
+    "SelectCandidate",
+    "ServiceView",
+    "ServicesView",
+    "dispatch",
+    "handleLine",
+    "main"
+   ],
+   "behavior_constraints": [
+    "ServiceConfig has a connection_limit_mode field accepting per-endpoint (default) and per-service",
+    "When connection_limit_mode is per-service, max_connections_per_endpoint caps total active connections across all endpoints combined",
+    "data-store service is configured with per-service mode and max_connections_per_endpoint=3, allowing at most 3 total connections",
+    "connection_limit_mode is reloadable via SIGHUP",
+    "get_service IPC response includes the current connection_limit_mode for the service",
+    "EndpointConfig has a warmup_duration_ms integer field (default 0, 0=disabled)",
+    "When an endpoint transitions from unhealthy or unknown to healthy (health check recovery or reset_circuit_breaker), a warm-up timer starts for warmup_duration_ms",
+    "During warm-up, effective weight is floor(0.25 * configured_weight) with a minimum of 1",
+    "After warm-up timer expires, effective weight becomes the full configured weight instantly",
+    "Endpoint remains eligible for routing during warm-up; only its weight is reduced"
+   ],
+   "affected_prior": [
+    "TryAddConnection",
+    "RecordHealthCheck",
+    "ResetCircuitBreaker",
+    "selectWeighted",
+    "selectWeightedCandidate",
+    "ApplyConfig",
+    "applyConfigLocked",
+    "ServiceView",
+    "dispatch",
+    "handleLine"
+   ],
+   "summary": "This round adds per-service connection limit mode (total cap across endpoints) and endpoint warm-up support (25% effective weight for a configurable duration after health recovery) with corresponding IPC commands and CLI output."
+  },
+  "instruction_head": "Update connection limit handling for `data-store` and add endpoint warm-up support.\n\n## Per-service connection limit mode\n\nAdd a new per-service config field `connection_limit_mode` (string). Accepted values are `\"per-endpoint\"` (default, preserves existing behavior) and `\"per-service\"`.\n\nWhen `connection_limit_mode = \"per-service\"`, the existing `max_connections_per_endpoint` value is reinterpreted as the maximum **total** active connections across all endpoints of that service combined, rather"
+ },
+ {
+  "round": 5,
+  "root": "/app",
+  "graph": {
+   "n_files": 12,
+   "n_edges": 46,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/circuit/breaker.go",
+     "pagerank": 0.137102,
+     "fan_in": 6,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/state/state.go",
+     "pagerank": 0.116348,
+     "fan_in": 6,
+     "fan_out": 4
+    },
+    {
+     "file": "internal/stats/stats.go",
+     "pagerank": 0.093429,
+     "fan_in": 4,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/state/ratelimit.go",
+     "pagerank": 0.092062,
+     "fan_in": 5,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/ipc/server.go",
+     "pagerank": 0.085361,
+     "fan_in": 4,
+     "fan_out": 9
+    },
+    {
+     "file": "internal/health/monitor.go",
+     "pagerank": 0.08445,
+     "fan_in": 4,
+     "fan_out": 8
+    },
+    {
+     "file": "internal/router/router.go",
+     "pagerank": 0.08445,
+     "fan_in": 4,
+     "fan_out": 8
+    },
+    {
+     "file": "internal/config/config.go",
+     "pagerank": 0.083089,
+     "fan_in": 4,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/state/routing.go",
+     "pagerank": 0.081648,
+     "fan_in": 5,
+     "fan_out": 2
+    },
+    {
+     "file": "internal/state/json.go",
+     "pagerank": 0.067338,
+     "fan_in": 4,
+     "fan_out": 4
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "internal/router/router.go",
+    "internal/ipc/server.go",
+    "cmd/meshctl/main.go",
+    "cmd/meshd/main.go"
+   ],
+   "target_symbols": [
+    "acceptLoop",
+    "forward",
+    "copyConn",
+    "handleConn",
+    "dispatch",
+    "handleLine",
+    "main",
+    "get_access_log",
+    "get_access_stats",
+    "access-log",
+    "access-stats",
+    "AccessLogger",
+    "LogEntry",
+    "Write",
+    "Flush",
+    "Rotate"
+   ],
+   "behavior_constraints": [
+    "Every completed or rejected connection writes a JSON line to /app/logs/access.log",
+    "Each entry has fields: ts (ISO 8601), service, client, endpoint (\"\" if none), bytes_in, bytes_out, duration_ms, result",
+    "result is one of: success, rejected_no_endpoint, rejected_rate_limit, rejected_conn_limit, retry_exhausted, idle_timeout",
+    "Log file and parent directory /app/logs are auto-created if missing",
+    "When access.log exceeds 1 MB it is renamed to access.log.1 (overwriting any existing .1) and a fresh access.log starts",
+    "Only one backup (access.log.1) is kept",
+    "Access logging uses a buffered channel / async writer goroutine and must not block connection handling",
+    "Access log buffer is fully flushed before graceful shutdown completes",
+    "get_access_log IPC command accepts optional service, last_n, result, min_duration_ms",
+    "get_access_log applies service/result/min_duration_ms filters first, then takes last_n entries"
+   ],
+   "affected_prior": [
+    "internal/router/router.go",
+    "cmd/meshd/main.go",
+    "internal/ipc/server.go",
+    "cmd/meshctl/main.go"
+   ],
+   "summary": "This round adds structured async JSON access logging with size-based rotation and flush-on-shutdown, plus get_access_log/get_access_stats IPC commands and meshctl access-log/access-stats CLI subcommands."
+  },
+  "instruction_head": "Now add structured access logging to meshrouter.\n\nEvery completed or rejected connection must write a JSON line to `/app/logs/access.log`. Each entry has these fields:\n- `ts`: ISO 8601 timestamp\n- `service`: service name\n- `client`: client address\n- `endpoint`: selected endpoint address, or `\"\"` if none was chosen\n- `bytes_in`, `bytes_out`: byte counts for the connection\n- `duration_ms`: milliseconds from accept to close\n- `result`: one of `\"success\"`, `\"rejected_no_endpoint\"`, `\"rejected_rate_l"
+ }
+]

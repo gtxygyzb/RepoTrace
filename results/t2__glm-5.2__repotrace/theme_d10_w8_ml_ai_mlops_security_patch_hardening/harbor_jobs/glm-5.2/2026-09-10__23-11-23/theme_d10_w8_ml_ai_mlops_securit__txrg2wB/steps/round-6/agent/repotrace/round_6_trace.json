@@ -1,0 +1,108 @@
+{
+ "round": 6,
+ "root": "/app",
+ "graph": {
+  "n_files": 12,
+  "n_edges": 48,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "internal/store/store.go",
+    "pagerank": 0.254459,
+    "fan_in": 8,
+    "fan_out": 7
+   },
+   {
+    "file": "internal/registry/registry.go",
+    "pagerank": 0.103779,
+    "fan_in": 6,
+    "fan_out": 2
+   },
+   {
+    "file": "internal/registry/validate.go",
+    "pagerank": 0.099473,
+    "fan_in": 4,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/audit/audit.go",
+    "pagerank": 0.080866,
+    "fan_in": 5,
+    "fan_out": 1
+   },
+   {
+    "file": "internal/inference/inference.go",
+    "pagerank": 0.080866,
+    "fan_in": 5,
+    "fan_out": 3
+   },
+   {
+    "file": "internal/metrics/metrics.go",
+    "pagerank": 0.080866,
+    "fan_in": 5,
+    "fan_out": 1
+   },
+   {
+    "file": "internal/server/handlers.go",
+    "pagerank": 0.073888,
+    "fan_in": 4,
+    "fan_out": 9
+   },
+   {
+    "file": "internal/auth/auth.go",
+    "pagerank": 0.07211,
+    "fan_in": 4,
+    "fan_out": 7
+   },
+   {
+    "file": "internal/webhooks/webhooks.go",
+    "pagerank": 0.07211,
+    "fan_in": 4,
+    "fan_out": 7
+   },
+   {
+    "file": "internal/config/config.go",
+    "pagerank": 0.032455,
+    "fan_in": 2,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "internal/server/router.go",
+   "internal/server/handlers.go",
+   "internal/server/ratelimit.go"
+  ],
+  "target_symbols": [
+   "Routes",
+   "Login",
+   "RegisterUser",
+   "clientIP",
+   "writeError",
+   "rateLimiter"
+  ],
+  "behavior_constraints": [
+   "POST /api/v1/auth/login is limited to 5 requests per 60 seconds per source IP; the 6th request within the window returns HTTP 429 with body {\"error\":\"rate limit exceeded\"}",
+   "POST /api/v1/auth/register is limited to 3 requests per 60 seconds per source IP; the 4th request within the window returns HTTP 429 with body {\"error\":\"rate limit exceeded\"}",
+   "Login and register rate-limit counters are tracked independently and do not share a bucket",
+   "Non-auth endpoints are not affected by the auth rate limiter",
+   "Only Go standard library packages are used for the rate limiter implementation",
+   "Within the configured rate limits, login (success and credential failure) and registration continue to behave exactly as before"
+  ],
+  "affected_prior": [
+   "Login",
+   "RegisterUser",
+   "Routes",
+   "clientIP"
+  ],
+  "summary": "This round adds independent per-IP rate limiting to the auth login (5/60s) and register (3/60s) endpoints, returning HTTP 429 with {\"error\":\"rate limit exceeded\"} when exceeded, without affecting other endpoints."
+ },
+ "instruction_head": "## Security Review: No Rate Limiting on Authentication Endpoints\n\nThe `/api/v1/auth/login` and `/api/v1/auth/register` endpoints accept an unlimited number of requests from any single IP address. An attacker can perform brute-force credential stuffing attacks at an unlimited rate, or abuse registration to flood the user database.\n\n### Required Fix\n\nEnforce per-IP rate limits on authentication endpoints:\n\n- **Login** (`/api/v1/auth/login`): **5 requests per 60 seconds** per source IP.\n- **Registe"
+}

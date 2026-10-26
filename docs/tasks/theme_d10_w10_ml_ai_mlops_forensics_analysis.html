@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ml-checkpoint-forensics-engine — EvoCode-Bench</title>
+<link rel="stylesheet" href="../assets/site.css">
+</head><body>
+<div class="wrap">
+  <header class="top">
+    <h1>ml-checkpoint-forensics-engine</h1>
+    <span class="crumb"><a href="../index.html">← all tasks</a></span>
+  </header>
+  <p class="sub">
+    <span class="pill hard">hard</span>
+    <span class="pill">ml forensics</span>
+    <span class="pill">9 rounds</span>
+    <span class="pill">theme_d10_w10_ml_ai_mlops_forensics_analysis</span><br>
+    Implement the `mlforge` CLI tool as specified in the project documentation.
+  </p>
+
+  <div class='analysis'><p style='margin:0'><strong>Only Opus-4.8 and GLM-5.2 solve all 9 rounds perfectly; GPT-5.5 reaches 7/9, but 9 of 12 models earn 0 or 1 rounds despite case scores of 35–98%.</strong></p></div>
+
+  <h2>What the agent is asked, round by round</h2>
+  <p class="sub" style="margin-top:0">Each round adds new requirements to the same workspace. Click a round to read the exact task the agent was given.</p>
+  <div id="rounds"></div>
+
+  <h2>Per-round test-case results</h2>
+  <div class="keybox">
+    <b>How to read the grid.</b> Every round ships an executable test suite. A cell like <b>43</b>/45&nbsp;<span class="xf">2✗</span>
+    means the model passed <b>43 of the round's 45 test cases</b> and <b>2 failed</b>. The round earns a reward of
+    <b>1 only if every case passes</b> — so a model can pass 43/45 and still score 0 for that round. The case counts
+    show the partial progress the 0/1 round score hides. Cell <b>color = how many cases failed</b> (green = 0).
+    A <b>build&nbsp;✗</b> cell means the model's code did not compile, so the tests could not run (a real 0 — the
+    reference solution builds fine). <b>n/a</b> means that run never reached this round. <b>Click any cell</b> for details below.
+  </div>
+  <div id="heatmap"></div>
+  <div class="legend">cases failed in the cell:
+    <i style="background:#2fae5f"></i>0<i style="background:#8ec74e"></i>1-2<i style="background:#d6c34a"></i>3-5
+    <i style="background:#e89a3c"></i>6-10<i style="background:#e3692f"></i>11-20<i style="background:#d23b34"></i>20+
+    <i style="background:#3a2730"></i>code didn't build<i style="background:#22272f"></i>round not run (n/a)</div>
+  <div id="detail"><span class="ph">Click a cell above to see the round's task and that model's failed requirements.</span></div>
+
+  <h2>Difficulty analysis</h2>
+  <div class='analysis'><p>This task implements <strong>mlforge</strong>, a CLI for ML-checkpoint forensics: ingest checkpoints, extract <span class='req'>metadata</span>, reconstruct <span class='req'>lineage</span> and <span class='req'>timeline</span>, <span class='req'>diff</span> versions, <span class='req'>query</span>, and detect anomalies (gradient spikes, severity levels) — 9 rounds across 12 models. The work is mostly pure data transformation, so the chain rarely aborts mid-sequence; all 12 models run to round 9, making it a clean capability probe rather than an endurance test.</p><p>The load-bearing failures are layered. <span class='req'>ingest</span> (failed by 6 models, <em>"got 5"</em>) cascades into timeline and lineage correctness, while <span class='req'>detect-evidence</span> and <span class='req'>detect-csv</span> (each failed by 7 models) expose gaps in anomaly-detection output formatting. <span class='req'>query-not</span> and <span class='req'>query-paren</span> (6 models each, <em>"expected status ok, got got"</em>) reveal parser defects, and <span class='req'>build</span> failures (6 models) block entire rounds outright — so even high case-pass rates cannot translate into round completions.</p></div>
+
+  <h2>Per-model failures (whole task)</h2>
+  <p class="sub" style="margin-top:0">Click a model to expand every requirement it failed across all rounds, with a representative reason from the verifier.</p>
+  <div id="breakdown"></div>
+
+  <h2>Performance gap</h2>
+  <div class='analysis'><p>This task <strong>discriminates sharply</strong>. <strong>Opus-4.8 and GLM-5.2 both pass all 9 rounds at 100% cases</strong> — the only models with full marks. GPT-5.5 is a close third at 7/9 rounds and 100% cases, losing only to a pair of late-round requirements. GLM-5.1 manages 1/9 rounds at 69% cases. Every other model lands at 0/9, despite case pass rates ranging from 35% (Kimi-K2.7-Code) up to 98% (Qwen3.6-Plus) and 92% (Kimi-K2.6).</p><p>The 0-round cluster illustrates how a high case score can mask a broken implementation: Qwen3.6-Plus at 98% cases and Kimi-K2.6 at 92% still fail every round because they cannot satisfy <span class='req'>detect-evidence</span>, <span class='req'>detect-csv</span>, or the <span class='req'>query-not</span>/<span class='req'>query-paren</span> parser requirements that gate full-round credit. Models at the lower end — MiniMax-M2.7 (72%), MiniMax-M3 (77%), Kimi-K2.7-Code (35%) — additionally stall on <span class='req'>build</span> and <span class='req'>ingest</span> failures. The decisive split is not breadth of effort but whether the model got the ingest contract, the anomaly-detection output schema, and the query parser all exactly right.</p></div>
+
+  <h2>Is the task fair? (top-model check)</h2>
+  <div class='analysis'><p>Claude Opus-4.8 — the strongest model in this evaluation — solved all 9 rounds at full marks, confirming the task is well-posed and fairly graded end-to-end; the reference (oracle) solution likewise passes every round. Weaker models' failures across <span class='req'>ingest</span>, <span class='req'>detect-evidence</span>, <span class='req'>detect-csv</span>, and the query-parser requirements therefore reflect genuine capability gaps, not ambiguous specifications or grading artifacts.</p></div>
+
+  <p class="foot">Test-case data extracted from the verifier <code>CASE_RESULT</code> logs of each model's run.
+    Reasons are the verifier's own <code>failure_reason</code> (back-filled from expected/actual when terse).</p>
+</div>
+
+<script src="../assets/site.js"></script>
+<script>
+fetch("../data/tasks/theme_d10_w10_ml_ai_mlops_forensics_analysis.json").then(function(r){return r.json();}).then(function(T){
+  window.__MODELS__ = Object.keys(T.models);
+  var detail = document.getElementById("detail");
+  EvoViz.renderRounds(document.getElementById("rounds"), T);
+  EvoViz.renderHeatmap(document.getElementById("heatmap"), T, function(model, round){
+    EvoViz.renderDetail(detail, T, model, round);
+    detail.scrollIntoView({behavior:"smooth", block:"nearest"});
+  });
+  EvoViz.renderBreakdown(document.getElementById("breakdown"), T);
+});
+</script>
+</body></html>

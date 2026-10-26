@@ -1,0 +1,322 @@
+[
+ {
+  "round": 1,
+  "root": "/app",
+  "graph": {
+   "n_files": 0,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": []
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go",
+    "cmd/ingest.go",
+    "cmd/transform.go",
+    "schema.go",
+    "recipe.go",
+    "expr.go",
+    "csvio.go",
+    "go.mod"
+   ],
+   "target_symbols": [
+    "main",
+    "runIngest",
+    "runTransform",
+    "Schema",
+    "ColumnSpec",
+    "validateRow",
+    "checkRequiredAndType",
+    "checkRange",
+    "checkPattern",
+    "checkUniqueness",
+    "sortByPrimaryKey",
+    "computeFileSHA256",
+    "Recipe",
+    "applyFilter",
+    "applyDerive",
+    "applySample",
+    "applySort",
+    "applyRename",
+    "applyDrop",
+    "applyAggregate"
+   ],
+   "behavior_constraints": [
+    "Tool is a Go CLI named dpipe with subcommands ingest and transform.",
+    "Outputs are bit-identical across repeated runs given identical input and configuration.",
+    "ingest reads a headered CSV and validates each row against a JSON schema.",
+    "Supported column types: int, float, string, datetime (RFC 3339).",
+    "Validation per-row order: required/type, then range, then pattern.",
+    "Uniqueness checked across all valid rows in input file order; later duplicate rejected with reason 'duplicate value for unique column: <name>'.",
+    "Range violations rejected with reason 'value out of range for column <name>: <value>'.",
+    "Pattern violations rejected with reason 'value does not match pattern for column <name>: <value>'.",
+    "Valid rows written to <output> CSV, sorted by primary_key columns in declaration order using each column's declared type ordering (ascending).",
+    "Rejected rows written to <output>.rejected with appended 'rejection_reason' column."
+   ],
+   "affected_prior": [],
+   "summary": "Build a deterministic Go CLI `dpipe` from scratch with ingest (CSV\u2192JSON-schema validation\u2192sorted valid output + rejected rows + SHA-256) and transform (recipe-driven operations including filter, derive with a full expression evaluator, deterministic sample, sort, rename, drop, aggregate, join, window, pivot, unpivot, fill) producing bit-identical outputs."
+  },
+  "instruction_head": "Build a deterministic data pipeline tool in Go called `dpipe`. The tool operates as a CLI that reads structured data from CSV files, applies a chain of transformations, and writes results to output files \u2014 with every step producing bit-identical output across repeated runs given the same input and configuration.\n\n## Core behaviors\n\n### Ingestion\n\n`dpipe ingest --input <path> --schema <path> --output <path>`\n\n- Reads a CSV file at `<path>`. The first row is a header.\n- Validates every row against"
+ },
+ {
+  "round": 2,
+  "root": "/app",
+  "graph": {
+   "n_files": 3,
+   "n_edges": 1,
+   "delta": {
+    "files_added": [
+     "csvio.go",
+     "expr.go",
+     "schema.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "schema.go",
+      "csvio.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "csvio.go",
+     "pagerank": 0.480519,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "expr.go",
+     "pagerank": 0.25974,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "schema.go",
+     "pagerank": 0.25974,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/profile.go",
+    "main.go",
+    "recipe.go",
+    "csvio.go",
+    "schema.go"
+   ],
+   "target_symbols": [
+    "runProfile",
+    "inferColumnType",
+    "computeColumnStats",
+    "computePercentile",
+    "computeCorrelations",
+    "applyDeduplicate",
+    "applySplit"
+   ],
+   "behavior_constraints": [
+    "profile command reads CSV (first row header), infers types, writes JSON statistical profile to output path with 2-space indentation and trailing newline",
+    "type inference order: int (ParseInt base10 bitsize64) \u2192 float (ParseFloat bitsize64) \u2192 datetime (RFC3339) \u2192 string; zero non-empty values \u2192 string",
+    "int and float columns include: count, null_count, unique, min, max, mean, stddev (population, sqrt(sum((xi-mean)^2)/n), 0 for single value), median, p25, p75",
+    "percentile: idx = p/100*(n-1); integer idx \u2192 values[idx]; else interpolate lower=floor(idx), upper=ceil(idx), frac=idx-lower, result=values[lower]+frac*(values[upper]-values[lower])",
+    "skewness: adjusted Fisher-Pearson with sample stddev (n-1); null if n<3 or s==0",
+    "kurtosis: sample excess kurtosis; null if n<4 or s==0",
+    "mode: most frequent value, smallest wins ties, null if all unique or count==0; int\u2192integer, float\u2192number",
+    "histogram: 10 equal-width bins, bins 0-8 [low,high), bin 9 [low,max]; identical values \u2192 single bin; empty count \u2192 []",
+    "string columns include: min_length, max_length (0 if count 0), most_common (top 5 by count desc, ties value asc), avg_length (0 if count 0)",
+    "datetime columns include: earliest and latest as RFC 3339 strings"
+   ],
+   "affected_prior": [
+    "main.go",
+    "cmd/transform.go",
+    "recipe.go",
+    "schema.go"
+   ],
+   "summary": "Add a profile command that infers column types and computes comprehensive statistics with a correlation matrix, plus deduplicate and split transforms."
+  },
+  "instruction_head": "Add the following capabilities to `dpipe`.\n\n## New command: `profile`\n\n`dpipe profile --input <path> --output <path>`\n\nReads a CSV file (first row is header), infers column types from data, and writes a JSON statistical profile to the output path.\n\n### Type inference\n\nSince `profile` operates without a schema, column types are inferred from non-empty values:\n\n1. If **all** non-empty values parse as integers (Go's `strconv.ParseInt` with base 10, bit size 64): type is `int`.\n2. Else if all non-em"
+ },
+ {
+  "round": 3,
+  "root": "/app",
+  "graph": {
+   "n_files": 9,
+   "n_edges": 14,
+   "delta": {
+    "files_added": [
+     "compare.go",
+     "jsonutil.go",
+     "main.go",
+     "pipeline.go",
+     "profile.go",
+     "stats.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "compare.go",
+      "csvio.go"
+     ],
+     [
+      "compare.go",
+      "jsonutil.go"
+     ],
+     [
+      "jsonutil.go",
+      "csvio.go"
+     ],
+     [
+      "main.go",
+      "compare.go"
+     ],
+     [
+      "main.go",
+      "csvio.go"
+     ],
+     [
+      "main.go",
+      "pipeline.go"
+     ],
+     [
+      "main.go",
+      "profile.go"
+     ],
+     [
+      "pipeline.go",
+      "compare.go"
+     ],
+     [
+      "pipeline.go",
+      "csvio.go"
+     ],
+     [
+      "pipeline.go",
+      "profile.go"
+     ],
+     [
+      "profile.go",
+      "csvio.go"
+     ],
+     [
+      "profile.go",
+      "jsonutil.go"
+     ],
+     [
+      "profile.go",
+      "stats.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "csvio.go",
+     "pagerank": 0.327611,
+     "fan_in": 6,
+     "fan_out": 0
+    },
+    {
+     "file": "jsonutil.go",
+     "pagerank": 0.130064,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "compare.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 2
+    },
+    {
+     "file": "profile.go",
+     "pagerank": 0.096273,
+     "fan_in": 2,
+     "fan_out": 3
+    },
+    {
+     "file": "stats.go",
+     "pagerank": 0.089148,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "pipeline.go",
+     "pagerank": 0.075018,
+     "fan_in": 1,
+     "fan_out": 3
+    },
+    {
+     "file": "expr.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 4
+    },
+    {
+     "file": "schema.go",
+     "pagerank": 0.061871,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "pipeline.go",
+    "profile.go",
+    "main.go",
+    "drift.go"
+   ],
+   "target_symbols": [
+    "main",
+    "cmdDrift",
+    "runDrift",
+    "buildProfile",
+    "inferProfileType",
+    "addNumericProfile",
+    "buildColumnProfile",
+    "runPipeline",
+    "recipeResample",
+    "detectDrift",
+    "buildDriftProfile"
+   ],
+   "behavior_constraints": [
+    "fill linear: empty cells with only a lower anchor use the lower anchor value; only an upper anchor use the upper anchor value; both anchors interpolate as v_lo + (v_hi - v_lo)*(i - lo)/(hi - lo); neither anchor leaves the cell empty.",
+    "normalize zscore uses sample standard deviation (denominator n-1); if n<2 or stddev==0, all output values are \"0\".",
+    "Numeric profile columns (int/float) include p05 and p95 computed with idx = p/100*(n-1) and linear interpolation between sorted neighbors.",
+    "drift command builds internal column profiles for baseline and current CSVs and detects schema drifts (column_added, column_removed, type_changed) for all columns and distribution drifts (mean_shift, null_rate_change, range_expansion, unique_ratio_change) for numeric columns present in both with same type and count>0.",
+    "Drift distribution formulas: mean_shift if |cur_mean - base_mean| / max(base_stddev, 1e-10) > threshold; null_rate_change if |null_rate diff| > threshold (null_rate = null_count/row_count, 0 if row_count 0); range_expansion if (cur_max - cur_min) > (base_max - base_min)*(1+threshold); unique_ratio_change if |unique_ratio diff| > threshold (unique_ratio = unique/count, 0 if count 0).",
+    "drift --threshold defaults to 0.1.",
+    "Drift output is JSON with 2-space indentation and trailing newline, containing drifts array and summary with total_drifts, schema_drifts, distribution_drifts.",
+    "Each drift entry has column, drift_type, baseline_value, current_value, and detail formatted exactly as specified.",
+    "Drifts sorted by column name ascending, then drift_type order: column_added, column_removed, type_changed, mean_shift, null_rate_change, range_expansion, unique_ratio_change.",
+    "Drift error handling: missing baseline/current prints ERROR: file not found: <path> exit 1; unparseable CSV prints ERROR: cannot parse CSV: <path> exit 1."
+   ],
+   "affected_prior": [
+    "fill transform linear strategy behavior",
+    "normalize transform zscore method",
+    "profile numeric column output (addNumericProfile, buildColumnProfile)",
+    "runPipeline transform dispatch and recipe handling",
+    "main command dispatch"
+   ],
+   "summary": "Corrects fill-linear extrapolation and zscore sample stddev, adds p05/p95 to profiles, introduces a drift command for schema/distribution drift detection, and adds a resample transform."
+  },
+  "instruction_head": "Add the following capabilities to `dpipe` and apply the specified behavior corrections.\n\n## Behavior Corrections\n\n### Fill linear: boundary extrapolation\n\nThe `fill` transform with `\"strategy\": \"linear\"` now handles boundary cells differently:\n\n- If only a **lower anchor** exists (no float-parseable non-empty cell found below the current empty cell), the empty cell is filled with the lower anchor's value.\n- If only an **upper anchor** exists (no float-parseable non-empty cell found above the cur"
+ }
+]

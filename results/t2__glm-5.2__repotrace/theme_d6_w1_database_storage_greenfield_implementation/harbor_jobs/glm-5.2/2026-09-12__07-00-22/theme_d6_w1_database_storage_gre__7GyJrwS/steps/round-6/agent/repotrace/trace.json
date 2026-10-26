@@ -1,0 +1,528 @@
+[
+ {
+  "round": 1,
+  "root": "/app",
+  "graph": {
+   "n_files": 0,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": []
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/kvstore/main.go",
+    "go.mod",
+    "internal/engine/engine.go",
+    "internal/wal/wal.go",
+    "internal/memtable/memtable.go",
+    "internal/sstable/sstable.go",
+    "internal/sstable/reader.go",
+    "internal/sstable/writer.go",
+    "internal/mvcc/snapshot.go",
+    "internal/mvcc/seqnum.go",
+    "internal/tx/transaction.go",
+    "internal/compaction/compaction.go",
+    "internal/cli/cli.go"
+   ],
+   "target_symbols": [
+    "main",
+    "Engine",
+    "MemTable",
+    "SSTable",
+    "SSTableReader",
+    "SSTableWriter",
+    "WAL",
+    "WAL.Append",
+    "WAL.Replay",
+    "WAL.Truncate",
+    "Snapshot",
+    "SnapshotManager",
+    "Transaction",
+    "TransactionManager",
+    "Batch",
+    "Compactor",
+    "Compactor.Compact",
+    "SeqNum",
+    "nextSeqNum",
+    "put"
+   ],
+   "behavior_constraints": [
+    "Binary builds with `go build -o kvstore ./cmd/kvstore` from /app",
+    "Accepts --data-dir <path> flag (default ./data)",
+    "Reads commands from stdin one per line, writes results to stdout",
+    "PUT key value -> OK <seqnum> (value is trimmed remainder after key)",
+    "GET key -> value or NOT_FOUND",
+    "DELETE key -> OK <seqnum>",
+    "DELETE_RANGE start end -> OK <seqnum>",
+    "SCAN start end [--prefix p] [--limit N] [--reverse] -> key\\tvalue lines, no tombstoned keys",
+    "FLUSH -> OK and forces MemTable to SSTable",
+    "COMPACT -> OK and triggers full compaction across all levels"
+   ],
+   "affected_prior": [],
+   "summary": "Build from scratch a Go LSM-Tree key-value engine with WAL, MemTable, SSTables, MVCC snapshots, optimistic transactions, batch writes, and a stdin/stdout CLI."
+  },
+  "instruction_head": "I need a high-performance embedded key-value storage engine built in Go from scratch, using an LSM-Tree (Log-Structured Merge-Tree) architecture with full MVCC (Multi-Version Concurrency Control) support, optimistic transactions, and advanced query capabilities. The engine must be accessible through a command-line interface that reads commands from stdin (one per line) and writes results to stdout.\n\n## CLI Interface\n\nThe binary should be buildable via `go build -o kvstore ./cmd/kvstore` from the"
+ },
+ {
+  "round": 2,
+  "root": "/app",
+  "graph": {
+   "n_files": 5,
+   "n_edges": 1,
+   "delta": {
+    "files_added": [
+     "internal/memtable/memtable.go",
+     "internal/mvcc/seqnum.go",
+     "internal/mvcc/snapshot.go",
+     "internal/tx/transaction.go",
+     "internal/wal/wal.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "internal/wal/wal.go",
+      "internal/memtable/memtable.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/memtable/memtable.go",
+     "pagerank": 0.316239,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/mvcc/seqnum.go",
+     "pagerank": 0.17094,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/mvcc/snapshot.go",
+     "pagerank": 0.17094,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/tx/transaction.go",
+     "pagerank": 0.17094,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/wal/wal.go",
+     "pagerank": 0.17094,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/kvstore/main.go",
+    "internal/engine/engine.go",
+    "internal/wal/wal.go",
+    "internal/memtable/memtable.go",
+    "internal/mvcc/snapshot.go",
+    "internal/tx/transaction.go"
+   ],
+   "target_symbols": [
+    "main",
+    "AppendSingle",
+    "AppendBatch",
+    "Replay",
+    "PointEntry",
+    "Add",
+    "AllEntries",
+    "EntriesInRange",
+    "PrefixScan",
+    "RangeTombstones",
+    "SSTable",
+    "SSTableReader"
+   ],
+   "behavior_constraints": [
+    "PUT --ttl <seconds> sets key to expire that many seconds after write time (wall-clock Unix seconds)",
+    "GET on an expired key returns NOT_FOUND",
+    "SCAN excludes expired keys from results",
+    "Compaction may GC expired keys but must respect MVCC snapshot visibility \u2014 a snapshot taken before the expiration timestamp still sees the key",
+    "TTL <key> returns remaining seconds until expiration as an integer rounded down, -1 if the key has no TTL, or NOT_FOUND if the key does not exist",
+    "PUT without --ttl on a key that previously had a TTL clears the TTL",
+    "TX_PUT and BATCH PUT accept --ttl <seconds>",
+    "STATS includes expired_keys (count of keys whose TTL elapsed but not yet GC'd) and total_keys must exclude expired keys",
+    "WAL single entry format: expire_at (uint64 LE, Unix seconds, 0 = no expiration) immediately after seqnum",
+    "WAL batch op format: op (uint8) + expire_at (uint64 LE) + key_len (uint32 LE) + key + val_len (uint32 LE) + value"
+   ],
+   "affected_prior": [
+    "WAL (binary format change \u2014 AppendSingle/AppendBatch/Replay must read/write expire_at)",
+    "MemTable (PointEntry struct gains expire_at; Add/AllEntries/EntriesInRange/PrefixScan/RangeTombstones must filter or expose expiration)",
+    "SSTable / SSTableReader (data block entry format change adds expire_at after seqnum)",
+    "Engine (GET/SCAN/STATS/TTL command logic must account for expiration and MVCC visibility)",
+    "CLI main (PUT/TX_PUT/BATCH PUT parsing gains --ttl flag; new TTL command; STATS output changes)"
+   ],
+   "summary": "Add TTL-based key expiration persisted in WAL and SSTables, with expired keys behaving as deleted across GET/SCAN/compaction, a new TTL command, --ttl support on PUT/TX_PUT/BATCH PUT, and STATS reporting expired_keys while excluding them from total_keys."
+  },
+  "instruction_head": "I need key expiration support. Add a `--ttl <seconds>` flag to `PUT` \u2014 when set, the key expires after that many seconds from the time of the write (use wall-clock time). Expired keys behave exactly like deleted keys: `GET` returns `NOT_FOUND`, `SCAN` excludes them, and compaction can GC them (respecting MVCC snapshot visibility \u2014 a snapshot taken before expiration still sees the key).\n\nNew command: `TTL <key>` \u2014 returns the remaining seconds until expiration (integer, rounded down), `-1` if the"
+ },
+ {
+  "round": 3,
+  "root": "/app",
+  "graph": {
+   "n_files": 5,
+   "n_edges": 1,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/memtable/memtable.go",
+     "pagerank": 0.316239,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/mvcc/seqnum.go",
+     "pagerank": 0.17094,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/mvcc/snapshot.go",
+     "pagerank": 0.17094,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/tx/transaction.go",
+     "pagerank": 0.17094,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/wal/wal.go",
+     "pagerank": 0.17094,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "internal/engine/engine.go",
+    "cmd/kvstore/main.go"
+   ],
+   "target_symbols": [
+    "compactL0ToL1",
+    "writeSSTable",
+    "SSTableWriter",
+    "SSTableReader",
+    "readBlock",
+    "VerifySSTables",
+    "main"
+   ],
+   "behavior_constraints": [
+    "L0-to-L1 compaction must retain key versions still visible to active MVCC snapshots; after such compaction, snapshots must not return NOT_FOUND for keys whose versions existed at snapshot time.",
+    "Full compaction behavior for snapshot visibility must remain correct and unchanged.",
+    "Every SSTable data block must be followed by a 4-byte little-endian CRC-32 (IEEE) checksum of the block's raw bytes.",
+    "SSTable index entry block_size must exclude the trailing checksum bytes.",
+    "SSTable reader must verify each data block checksum on read and return 'ERROR: data corruption detected' on mismatch.",
+    "VERIFY command must scan every SSTable file in the data directory and validate footer magic, all data block checksums, bloom filter integrity, and index integrity.",
+    "VERIFY must print 'OK' if all files are clean; otherwise print 'CORRUPT: <filename> (<reason>)' per corrupt file and a final 'VERIFY_FAILED: <N> file(s) corrupted'."
+   ],
+   "affected_prior": [
+    "L0-to-L1 compaction path in internal/engine/engine.go",
+    "MVCC snapshot reads in internal/mvcc/snapshot.go",
+    "SSTable writer/reader format from round 1",
+    "CLI command dispatch in cmd/kvstore/main.go"
+   ],
+   "summary": "Fix L0-to-L1 compaction to preserve snapshot-visible versions and add CRC-32 SSTable data block checksums with a VERIFY command that validates all SSTables."
+  },
+  "instruction_head": "Two things this round.\n\nFirst, there's a snapshot bug: if you write a bunch of keys, take a snapshot, write new versions of those keys, and enough flushes happen to trigger the L0-to-L1 compaction, the snapshot starts returning `NOT_FOUND` for keys it should still see. The full compaction path handles this correctly, so it's just the L0 compaction that's dropping versions it shouldn't. Fix that.\n\nSecond, add data block checksums to SSTables. Each data block should be followed by a CRC-32 (IEEE) "
+ },
+ {
+  "round": 4,
+  "root": "/app",
+  "graph": {
+   "n_files": 5,
+   "n_edges": 1,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/memtable/memtable.go",
+     "pagerank": 0.316239,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/mvcc/seqnum.go",
+     "pagerank": 0.17094,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/mvcc/snapshot.go",
+     "pagerank": 0.17094,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/tx/transaction.go",
+     "pagerank": 0.17094,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/wal/wal.go",
+     "pagerank": 0.17094,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/kvstore/main.go",
+    "internal/engine/engine.go",
+    "internal/wal/wal.go",
+    "internal/memtable/memtable.go",
+    "internal/mvcc/snapshot.go",
+    "internal/tx/transaction.go"
+   ],
+   "target_symbols": [
+    "MERGE",
+    "TX_MERGE",
+    "AppendSingle",
+    "AppendBatch",
+    "Replay",
+    "PointEntry",
+    "AllEntries",
+    "EntriesInRange",
+    "compactL0ToL1",
+    "writeSSTable",
+    "SSTableReader",
+    "STATS"
+   ],
+   "behavior_constraints": [
+    "MERGE <key> <operand> appends operand to the key's value as a comma-separated list and outputs 'OK <seqnum>'",
+    "If key does not exist or was deleted, MERGE makes the operand the sole value",
+    "Multiple MERGEs stack: MERGE k a; MERGE k b; MERGE k c => GET k returns 'a,b,c'",
+    "PUT k x; MERGE k y; MERGE k z => GET k returns 'x,y,z'",
+    "MERGE entries use op_type 4 in WAL and SSTable records, storing the operand in the value field",
+    "Read path (GET, SCAN, snapshot reads, transaction reads) collects all MERGE entries for a key back to the most recent PUT or DELETE (or start of history) and folds them left-to-right with comma joining",
+    "TX_MERGE <tx_id> <key> <operand> and BATCH MERGE <key> <operand> behave identically to MERGE",
+    "During compaction, a run of MERGE entries for the same key collapses into a single entry only if no open snapshot needs the intermediate states",
+    "A run of MERGEs with no preceding PUT compacts into a single PUT whose value is the folded comma-joined result",
+    "STATS reports merge_operations = total number of uncompacted MERGE entries across the memtable and all SSTables"
+   ],
+   "affected_prior": [
+    "AppendSingle (op_type 4 encoding)",
+    "AppendBatch (batched MERGE entries)",
+    "Replay (decoding op_type 4)",
+    "PointEntry / AllEntries / EntriesInRange (memtable must expose merge entries for folding)",
+    "compactL0ToL1 (merge-run collapse respecting open snapshots)",
+    "writeSSTable / SSTableReader (persist and read op_type 4)",
+    "mvcc snapshot reads (must apply merge folding)",
+    "tx transaction reads (must apply merge folding)",
+    "STATS (new merge_operations counter)",
+    "main command parser (new MERGE / TX_MERGE / BATCH MERGE commands)"
+   ],
+   "summary": "This round adds a MERGE operator (op_type 4) that accumulates comma-separated operands across WAL, memtable, SSTables, snapshots, and transactions, with read-path left-to-right folding and compaction-time collapse of MERGE runs when no snapshot needs intermediates."
+  },
+  "instruction_head": "Add a merge operator. New command: `MERGE <key> <operand>` \u2014 appends the operand to the key's value as a comma-separated list. If the key already has a value from a previous PUT or MERGE, the new operand is appended with a comma separator. If the key doesn't exist or was deleted, the operand becomes the sole value. Multiple MERGEs stack: `MERGE k a`, `MERGE k b`, `MERGE k c` then `GET k` returns `a,b,c`. If a PUT preceded them \u2014 `PUT k x`, `MERGE k y`, `MERGE k z` \u2014 GET returns `x,y,z`. Output o"
+ },
+ {
+  "round": 5,
+  "root": "/app",
+  "graph": {
+   "n_files": 5,
+   "n_edges": 1,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/memtable/memtable.go",
+     "pagerank": 0.316239,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/mvcc/seqnum.go",
+     "pagerank": 0.17094,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/mvcc/snapshot.go",
+     "pagerank": 0.17094,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/tx/transaction.go",
+     "pagerank": 0.17094,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/wal/wal.go",
+     "pagerank": 0.17094,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "internal/engine/engine.go",
+    "cmd/kvstore/main.go",
+    "internal/memtable/memtable.go"
+   ],
+   "target_symbols": [
+    "writeSSTable",
+    "SSTableWriter",
+    "SSTableReader",
+    "readBlock",
+    "compactL0ToL1",
+    "SCAN",
+    "SNAP_SCAN",
+    "TX_SCAN",
+    "EntriesInRange"
+   ],
+   "behavior_constraints": [
+    "First entry of each data block has NO shared_prefix_len field (absent, not zero) and stores full key as before",
+    "Non-first entries in a block are laid out as: shared_prefix_len (uint16 LE) + key_len (uint32 LE) + key_suffix + val_len (uint32 LE) + value + op_type (uint8) + seqnum (uint64 LE) + expire_at (uint64 LE)",
+    "shared_prefix_len is computed against the previous entry's FULL (decompressed) key, counting shared leading bytes",
+    "key_len and key fields for non-first entries hold only the non-shared suffix bytes",
+    "Per-block CRC-32 covers the compressed block bytes exactly as written",
+    "Index section, bloom filter, footer, and range tombstone section remain unchanged in format",
+    "SCAN a z returns keys satisfying key >= a AND key < z (exclusive end)",
+    "SNAP_SCAN and TX_SCAN also use exclusive end key semantics",
+    "--reverse flag reverses only output ordering and must not change the [start, end) range boundaries",
+    "DELETE_RANGE must keep inclusive end key boundaries and must not be changed"
+   ],
+   "affected_prior": [
+    "SSTable data block write format (round 3: writeSSTable/SSTableWriter)",
+    "SSTable data block read path (round 3: SSTableReader/readBlock)",
+    "CRC-32 per-block checksum (round 3) \u2014 must cover compressed bytes",
+    "VERIFY command (round 3) \u2014 must validate compressed blocks",
+    "compactL0ToL1 (round 3) \u2014 emits SSTables in new compressed format",
+    "SCAN/SNAP_SCAN/TX_SCAN commands (round 1+) \u2014 boundary semantics flip to exclusive end",
+    "EntriesInRange in memtable (round 1) \u2014 likely needs exclusive-end handling for scan path"
+   ],
+   "summary": "This round adds shared-prefix (key-prefix delta) compression to SSTable data blocks while keeping the block CRC-32 over the compressed bytes, and switches SCAN/SNAP_SCAN/TX_SCAN to an exclusive end key while leaving DELETE_RANGE inclusive."
+  },
+  "instruction_head": "Two changes this round.\n\nFirst, add shared-prefix compression to SSTable data blocks. Within each data block, the first entry stores its full key using the existing format. Every subsequent entry stores a `shared_prefix_len` (uint16 LE) immediately before the `key_len` field, where `shared_prefix_len` is the number of leading bytes the key shares with the *previous* entry's full key. The `key_len` and `key` fields then contain only the non-shared suffix. So each non-first entry in a block is: `s"
+ },
+ {
+  "round": 6,
+  "root": "/app",
+  "graph": {
+   "n_files": 5,
+   "n_edges": 1,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/memtable/memtable.go",
+     "pagerank": 0.316239,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/mvcc/seqnum.go",
+     "pagerank": 0.17094,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/mvcc/snapshot.go",
+     "pagerank": 0.17094,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/tx/transaction.go",
+     "pagerank": 0.17094,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/wal/wal.go",
+     "pagerank": 0.17094,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/kvstore/main.go",
+    "internal/engine/engine.go",
+    "internal/mvcc/snapshot.go"
+   ],
+   "target_symbols": [
+    "CURSOR_OPEN",
+    "CURSOR_NEXT",
+    "CURSOR_PREV",
+    "CURSOR_SEEK",
+    "CURSOR_CLOSE",
+    "Cursor",
+    "OpenCursor",
+    "CursorNext",
+    "CursorPrev",
+    "CursorSeek",
+    "CloseCursor",
+    "STATS",
+    "open_cursors"
+   ],
+   "behavior_constraints": [
+    "CURSOR_OPEN creates a cursor over a snapshot taken at open time and outputs CURSOR:<id> with id monotonically increasing from 1; the cursor starts before the first key in its active direction.",
+    "--prefix <p> restricts the cursor to keys with that prefix; --reverse swaps CURSOR_NEXT and CURSOR_PREV directions.",
+    "CURSOR_NEXT advances one position in the cursor direction and outputs <key>\t<value>, or END if exhausted.",
+    "CURSOR_PREV moves one position opposite to the cursor direction and outputs <key>\t<value>, or END if before the first key in the active direction.",
+    "CURSOR_SEEK positions at the smallest key >= seek key, or largest key <= seek key when --reverse, outputs <key>\t<value> or END; after seek, CURSOR_NEXT advances from the seeked position and CURSOR_PREV returns the key before the seeked position.",
+    "CURSOR_CLOSE outputs OK and releases the cursor and its underlying snapshot.",
+    "Operations on invalid cursor IDs return ERROR: invalid cursor.",
+    "Cursors see a consistent snapshot view: expired, deleted, and range-tombstoned keys are invisible.",
+    "Merged keys return their folded merge value from the R4 read path.",
+    "STATS includes open_cursors."
+   ],
+   "affected_prior": [
+    "STATS command and output",
+    "MVCC snapshot acquisition/release and snapshot ID management",
+    "Engine snapshot scan/read path for TTL expiry, deletes, range tombstones, and merge folding",
+    "CLI command dispatch in cmd/kvstore/main.go"
+   ],
+   "summary": "Add server-side snapshot-backed cursors with CURSOR_OPEN/NEXT/PREV/SEEK/CLOSE commands, prefix and reverse flags, monotonic cursor IDs, and STATS open_cursors."
+  },
+  "instruction_head": "Add server-side cursors. `CURSOR_OPEN [flags]` creates a cursor backed by a snapshot taken at open time. Output: `CURSOR:<id>` where id is a monotonically increasing integer starting at 1. The cursor starts positioned *before* the first key. Flags: `--prefix <p>` restricts the cursor to keys with that prefix, `--reverse` flips the direction so CURSOR_NEXT goes backward and CURSOR_PREV goes forward.\n\n`CURSOR_NEXT <cursor_id>` \u2014 advance one position, output `<key>\\t<value>`, or `END` if exhausted."
+ }
+]

@@ -1,0 +1,57 @@
+{
+ "round": 5,
+ "root": "/app",
+ "graph": {
+  "n_files": 1,
+  "n_edges": 0,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "main.go",
+    "pagerank": 1.0,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "main.go"
+  ],
+  "target_symbols": [
+   "ingest",
+   "writeManifest",
+   "writeManifestSignature",
+   "parseArgs",
+   "loadState",
+   "loadRates"
+  ],
+  "behavior_constraints": [
+   "--ingest-id must match ^[A-Za-z0-9][A-Za-z0-9_.:-]*$ and be 1..128 chars; otherwise exit 2 with exact stderr 'ingest: --ingest-id: invalid (must match ^[A-Za-z0-9][A-Za-z0-9_.:-]*$, 1..128 chars)'",
+   "When --ingest-id is absent, manifest ingest_id is JSON null (not empty string)",
+   "--ingest-id alone (without --out-parquet-manifest) is a byte-for-byte no-op for --output, --rejects, --state-out, --audit-log, --audit-log-digest",
+   "When neither new flag is passed, behavior is byte-for-byte identical to the strict-rates feature",
+   "--out-parquet-manifest writes pretty-printed JSON (2-space indent, trailing newline) with top-level keys in exact order: schema_version, ingest_id, run_index, rates_digest, input_shards, outputs, window",
+   "schema_version is always the literal 'eventq.manifest/v1'",
+   "run_index = priorState.run_index + 1 when --state-in points to existing valid state; otherwise 1 (cold start or missing file)",
+   "rates_digest is 64-char lowercase hex, always present (never null)",
+   "input_shards array sorted by basename ASCII-ascending; each record has keys in order: shard, sha256, bytes, events_total, events_accepted",
+   "events_total counts non-blank lines; events_accepted counts lines whose final audit-bucket is accepted (late/invalid/duplicate/unresolved_chargeback excluded)"
+  ],
+  "affected_prior": [
+   "ingest",
+   "loadState",
+   "loadRates/loadRateMap (rates_digest)",
+   "audit-log digest (bucket_counts semantics)",
+   "saveState (run_index)"
+  ],
+  "summary": "Add an optional per-run ingest manifest (--out-parquet-manifest) with --ingest-id label and optional --manifest-signature sidecar, emitting deterministic pretty-printed JSON describing the run without altering existing output bytes."
+ },
+ "instruction_head": "## Ingest Manifest (`--out-parquet-manifest` + `--ingest-id`)\n\nAdd a new user-visible capability \u2014 a per-run **ingest manifest** \u2014 without changing any of the output bytes produced by existing flags. Two new flags are introduced and work in combination:\n\n- `--ingest-id <string>`: an optional, user-supplied label for the run.\n- `--out-parquet-manifest <path>`: an optional path; when set, the CLI writes a JSON manifest describing the run.\n\nWhen neither new flag is passed, the CLI behaves byte-for-"
+}

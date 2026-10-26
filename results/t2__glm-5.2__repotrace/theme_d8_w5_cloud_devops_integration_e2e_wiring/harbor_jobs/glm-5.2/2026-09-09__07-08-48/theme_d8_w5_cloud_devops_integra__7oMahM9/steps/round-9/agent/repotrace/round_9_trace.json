@@ -1,0 +1,63 @@
+{
+ "round": 9,
+ "root": "/app",
+ "graph": {
+  "n_files": 1,
+  "n_edges": 0,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "pipeline.sh",
+    "pagerank": 1.0,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "pipeline.sh"
+  ],
+  "target_symbols": [
+   "quota",
+   "quota_set",
+   "quota_get",
+   "quota_list",
+   "quota_remove",
+   "quota_check",
+   "deploy",
+   "scale_set",
+   "scale_all",
+   "status",
+   "history"
+  ],
+  "behavior_constraints": [
+   "Quota state is persisted in /app/.pipeline/quotas/<environment>.json as a JSON object mapping resource names to integer limits.",
+   "Supported quota resources are only max_services and max_total_replicas; unsupported resource outputs: ERROR: unknown quota resource '<resource>' (must be max_services or max_total_replicas).",
+   "quota <env> set <resource> <limit> validates in order: environment exists (ERROR: unknown environment '<env>'), resource supported, then limit is a positive integer >=1 (ERROR: invalid quota limit '<limit>'); on success prints QUOTA <env>: <resource>=<limit>, creates/updates the quota, and logs QUOTA_SET.",
+   "quota <env> get <resource> prints <resource>: <limit> (current: <usage>) when set, or <resource>: not set (current: <usage>) when unset; errors on unknown environment or unsupported resource; usage for max_services is the count of currently deployed services, and for max_total_replicas is the sum of all service replica counts defaulting to 1 per service if not explicitly scaled.",
+   "quota <env> list prints only explicitly set quotas, one per line as <resource>: <limit> (current: <usage>), and prints nothing when no quotas are set; errors on unknown environment.",
+   "quota <env> remove <resource> validates env/resource (same errors as set), errors if not set (ERROR: quota '<resource>' not set in <env>), otherwise prints QUOTA <env>: removed <resource>, removes the quota, and logs QUOTA_REMOVE.",
+   "quota <env> --check prints <resource>: OK (<usage>/<limit>) or <resource>: EXCEEDED (<usage>/<limit>) for each set quota, then All quotas OK if none exceeded or <N> quota(s) exceeded if any are exceeded; errors on unknown environment.",
+   "quota set and quota remove are blocked on locked environments; quota get, quota list, and quota --check work on locked environments.",
+   "When max_services is set, deploying a new service (not already deployed) checks after the lock check and before deployment; if current deployed service count + 1 would exceed the limit, it errors ERROR: deploying <service> would exceed max_services quota (<current+1>/<limit>) in <env>; redeploying an existing service is not checked, and each new service in a dependency deploy loop is checked individually.",
+   "When max_total_replicas is set, scale set checks after the health check and before updating replicas; projected total = current total replicas - service current count + new count; if exceeded, errors ERROR: scaling <service> to <count> would exceed max_total_replicas quota (<projected>/<limit>) in <env>."
+  ],
+  "affected_prior": [
+   "deploy",
+   "scale_set",
+   "scale_all",
+   "status",
+   "history",
+   "lock enforcement"
+  ],
+  "summary": "Add environment resource quotas for max_services and max_total_replicas with quota set/get/list/remove/--check, persistent quota state, lock enforcement on writes, deploy and scale enforcement, history events, and status integration."
+ },
+ "instruction_head": "Add resource quotas to the pipeline orchestrator. Quotas allow setting environment-level limits on the number of services and total replicas.\n\n**`pipeline.sh quota <environment> set <resource> <limit>`** \u2014 Set a resource quota for an environment. Supported resources: `max_services` (maximum number of deployed services) and `max_total_replicas` (maximum sum of all service replica counts). Limit must be a positive integer (>= 1). Output: `QUOTA <env>: <resource>=<limit>`. Error if resource is unsu"
+}

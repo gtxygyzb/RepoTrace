@@ -1,0 +1,63 @@
+{
+ "round": 3,
+ "root": "/app",
+ "graph": {
+  "n_files": 1,
+  "n_edges": 0,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "nlsolve.c",
+    "pagerank": 1.0,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "nlsolve.c"
+  ],
+  "target_symbols": [
+   "solve_cg",
+   "solve_bicgstab",
+   "read_matrix",
+   "build_csr",
+   "add_entry",
+   "precond_apply",
+   "precond_setup",
+   "compute_diag",
+   "spmv",
+   "vec_norm2",
+   "main"
+  ],
+  "behavior_constraints": [
+   "After the solver loop finishes, residual_norm must be recomputed as ||b - A*x||_2 / ||b||_2 using the final solution vector, replacing the iteratively-updated residual value.",
+   "The converged field must be true if and only if the recomputed true residual is below the tolerance, regardless of the iterative residual.",
+   "Per-iteration --history lines must continue to print the iterative residual, not the true residual.",
+   "The iterations count reported must remain whatever the solver loop produced (unchanged by fix 1).",
+   "The Matrix Market reader must sum duplicate entries for the same (row, column) position into a single matrix element, both for raw file entries and for entries produced by symmetric expansion.",
+   "Symmetric expansion of a matrix with duplicate lower-triangle positions must merge all resulting duplicate COO entries before building CSR.",
+   "When ||b||_2 == 0, the solver must not be called; instead immediately output iterations: 0, residual_norm: 0.000000e+00, converged: yes, and all solution entries x[i] = 0.000000e+00.",
+   "The zero-RHS shortcut must apply to both CG and BiCGSTAB.",
+   "In SSOR forward and backward sweeps, if the diagonal entry for a row is exactly zero, the corresponding output component must be set to zero instead of dividing by zero.",
+   "All outputs for inputs that do not trigger these bugs must remain exactly the same as before."
+  ],
+  "affected_prior": [
+   "read_matrix (Matrix Market reader, round 1)",
+   "build_csr / add_entry (CSR construction, round 1)",
+   "solve_cg (CG solver, rounds 1-2)",
+   "solve_bicgstab (BiCGSTAB solver, rounds 1-2)",
+   "precond_apply / precond_setup / compute_diag (SSOR preconditioner, round 1)",
+   "main (CLI/reporting, rounds 1-2)"
+  ],
+  "summary": "Fix correctness bugs: report true residual and convergence after the solver loop, merge duplicate Matrix Market entries (including symmetric expansion), short-circuit zero-RHS cases to a zero solution, and guard SSOR sweeps against zero diagonal entries."
+ },
+ "instruction_head": "Code review found correctness bugs that silently produce wrong numerical results on valid inputs. Fix every issue listed below. All output for inputs that do not trigger these bugs must remain exactly the same.\n\n1. The `residual_norm` field uses the iteratively-updated residual, which accumulates floating-point rounding errors over many iterations and can diverge from the actual error. After the solver loop finishes, explicitly recompute the true residual as `||b - A * x||_2 / ||b||_2` using the"
+}

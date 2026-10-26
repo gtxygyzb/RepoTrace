@@ -1,0 +1,136 @@
+{
+ "round": 5,
+ "root": "/app",
+ "graph": {
+  "n_files": 22,
+  "n_edges": 20,
+  "delta": {
+   "files_added": [
+    "packages/libbase/src/libbase.c"
+   ],
+   "files_removed": [],
+   "edges_added": [
+    [
+     "lib/builder.sh",
+     "lib/depgraph.sh"
+    ],
+    [
+     "lib/cache.sh",
+     "lib/depgraph.sh"
+    ]
+   ],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "lib/manifest.sh",
+    "pagerank": 0.344034,
+    "fan_in": 7,
+    "fan_out": 1
+   },
+   {
+    "file": "lib/common.sh",
+    "pagerank": 0.340907,
+    "fan_in": 6,
+    "fan_out": 1
+   },
+   {
+    "file": "lib/depgraph.sh",
+    "pagerank": 0.0409,
+    "fan_in": 3,
+    "fan_out": 2
+   },
+   {
+    "file": "lib/cache.sh",
+    "pagerank": 0.025255,
+    "fan_in": 3,
+    "fan_out": 1
+   },
+   {
+    "file": "lib/builder.sh",
+    "pagerank": 0.016027,
+    "fan_in": 1,
+    "fan_out": 4
+   },
+   {
+    "file": "lib/artifact.sh",
+    "pagerank": 0.013699,
+    "fan_in": 0,
+    "fan_out": 2
+   },
+   {
+    "file": "lib/configgen.sh",
+    "pagerank": 0.013699,
+    "fan_in": 0,
+    "fan_out": 2
+   },
+   {
+    "file": "lib/reporter.sh",
+    "pagerank": 0.013699,
+    "fan_in": 0,
+    "fan_out": 2
+   },
+   {
+    "file": "packages/libbase/src/base.c",
+    "pagerank": 0.013699,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "packages/libbase/src/base.h",
+    "pagerank": 0.013699,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "lib/cache.sh",
+   "lib/builder.sh",
+   "lib/common.sh",
+   "tests/run_tests.sh"
+  ],
+  "target_symbols": [
+   "get_src_mtime",
+   "is_cache_valid",
+   "update_cache",
+   "invalidate_cache",
+   "clean_cache",
+   "get_changed_packages",
+   "init_cache",
+   "_forge_cache_profile",
+   "build_package",
+   "build_changed_packages",
+   "clean_package",
+   "compute_source_hash",
+   "get_source_hash",
+   "read_cache_stamp",
+   "write_cache_stamp",
+   "cmd_cache_status",
+   "cache_status"
+  ],
+  "behavior_constraints": [
+   "Source hash for a package is SHA256 of newline-separated sorted SHA256 hashes of all files under src/ plus the Makefile plus package.forge",
+   "touch-ing a file without changing its content does NOT invalidate the cache because the SHA256 is unchanged",
+   "Cache is valid only when the package's current source hash matches the stored hash AND every transitive dependency's current source hash matches the hash recorded at last build time",
+   "Cache stamp file is .forge_cache/<pkg>-<profile>.hash with format: own hash on line 1, then <dep_name>:<dep_hash> lines for each transitive dependency",
+   "Old .stamp files from the timestamp-based cache are treated as cache misses without error",
+   "When a package is rebuilt the old .stamp file (if any) is replaced by the new .hash file",
+   "forge cache status prints a table with columns PACKAGE, PROFILE, STATUS",
+   "forge cache status --package NAME shows status for only that package",
+   "STATUS field values are: cached (<first 8 chars of hash>...), stale (src changed), stale (dep NAME changed), no cache",
+   "forge cache status --profile defaults to release"
+  ],
+  "affected_prior": [
+   "lib/cache.sh timestamp-based functions (get_src_mtime, is_cache_valid, update_cache, invalidate_cache, clean_cache, get_changed_packages, init_cache, _forge_cache_profile)",
+   "lib/builder.sh build_package and build_changed_packages which invoke cache validity checks",
+   "lib/common.sh clean_package which calls cache invalidation and must handle .hash stamps",
+   "Round 3 profile-aware cache invalidation (stamp file naming changes from .stamp to .hash)",
+   "Round 4 build_changed/selective-rebuild logic which relied on timestamp-based get_changed_packages"
+  ],
+  "summary": "Replace the timestamp-based build cache with a content-addressable SHA256 cache that stores per-package source hashes plus transitive dependency hashes, add a forge cache status command, and treat old .stamp files as cache misses."
+ },
+ "instruction_head": "# Round 5: Content-Addressable Build Cache\n\nThe timestamp-based cache has a fundamental flaw: operations like `touch` that modify mtime without changing content cause unnecessary rebuilds. We're switching to content-addressable caching based on SHA256 hashes.\n\n## Cache Key Computation\n\nReplace the timestamp-based freshness check with a content hash. The cache key for a package is computed as:\n\n```\nSHA256(sorted concatenation of SHA256 hashes of all files in src/ + Makefile + package.forge)\n```\n\n"
+}

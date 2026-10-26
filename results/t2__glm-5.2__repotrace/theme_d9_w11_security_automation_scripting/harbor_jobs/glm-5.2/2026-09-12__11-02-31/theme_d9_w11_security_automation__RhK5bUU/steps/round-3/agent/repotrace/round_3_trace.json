@@ -1,0 +1,128 @@
+{
+ "round": 3,
+ "root": "/app",
+ "graph": {
+  "n_files": 9,
+  "n_edges": 20,
+  "delta": {
+   "files_added": [
+    "enrich.go"
+   ],
+   "files_removed": [],
+   "edges_added": [
+    [
+     "enrich.go",
+     "event.go"
+    ],
+    [
+     "enrich.go",
+     "main.go"
+    ],
+    [
+     "enrich.go",
+     "threats.go"
+    ],
+    [
+     "main.go",
+     "enrich.go"
+    ]
+   ],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "event.go",
+    "pagerank": 0.249724,
+    "fan_in": 5,
+    "fan_out": 0
+   },
+   {
+    "file": "main.go",
+    "pagerank": 0.188901,
+    "fan_in": 5,
+    "fan_out": 5
+   },
+   {
+    "file": "threats.go",
+    "pagerank": 0.143921,
+    "fan_in": 4,
+    "fan_out": 1
+   },
+   {
+    "file": "analyze.go",
+    "pagerank": 0.072365,
+    "fan_in": 1,
+    "fan_out": 4
+   },
+   {
+    "file": "enrich.go",
+    "pagerank": 0.072365,
+    "fan_in": 1,
+    "fan_out": 3
+   },
+   {
+    "file": "filter.go",
+    "pagerank": 0.072365,
+    "fan_in": 1,
+    "fan_out": 2
+   },
+   {
+    "file": "respond.go",
+    "pagerank": 0.072365,
+    "fan_in": 1,
+    "fan_out": 1
+   },
+   {
+    "file": "summarize.go",
+    "pagerank": 0.072365,
+    "fan_in": 1,
+    "fan_out": 3
+   },
+   {
+    "file": "chain.go",
+    "pagerank": 0.055629,
+    "fan_in": 1,
+    "fan_out": 1
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "enrich.go",
+   "main.go",
+   "correlate.go"
+  ],
+  "target_symbols": [
+   "runEnrich",
+   "computeIOCMatches",
+   "processIOC",
+   "enrichThreat",
+   "runCorrelate",
+   "main",
+   "newFlagSet",
+   "parseFlags"
+  ],
+  "behavior_constraints": [
+   "Exact ipv4 IOC matches (passing freshness and min-confidence) form a shadow set of (field_name, IP_address) pairs.",
+   "CIDR candidate collection skips any (field_name, IP_address) pair present in the shadow set.",
+   "Shadowing granularity is per (field_name, IP_address); array field elements are considered independently so only the matched element IP is shadowed.",
+   "Order of operations: base_effective_confidence -> min-confidence filter -> non-CIDR matches -> build shadow set -> collect CIDR candidates (skip shadowed) -> resolve CIDR specificity (longest prefix) -> matched_fields -> adjusted_confidence -> scoring/sort/output.",
+   "All other enrich behavior (freshness tiers, field multipliers, scoring formula, sorting) remains unchanged.",
+   "New correlate subcommand: secsentinel correlate --time-window <minutes> [--min-campaign-size <int>] reads enriched threat JSON objects from stdin, one per line.",
+   "Two threats are linked iff they share at least one threat actor AND |ref_timestamp_i - ref_timestamp_j| <= time_window minutes.",
+   "Reference timestamp is first_seen for most threat types and timestamp for privilege_escalation threats.",
+   "A campaign is a connected component in the link graph (transitive linking).",
+   "Threats with empty threat_actors array can never be linked."
+  ],
+  "affected_prior": [
+   "runEnrich",
+   "computeIOCMatches",
+   "processIOC",
+   "enrichThreat",
+   "main (CLI dispatch)"
+  ],
+  "summary": "This round adds IPv4 exact-match shadowing of CIDR matches in the enrich subcommand and introduces a new correlate subcommand that groups enriched threats into connected-component attack campaigns by shared actors and temporal proximity, emitting campaign JSON with cohesion, propagation_score, and risk metrics."
+ },
+ "instruction_head": "Add IPv4 exact-match shadowing to the `enrich` subcommand and add a new `correlate` subcommand that groups enriched threats into attack campaigns.\n\n---\n\n### Correction: IPv4 Exact-Match Shadowing in `enrich`\n\nModify the `enrich` subcommand so that exact `ipv4` IOC matches take priority over `ipv4_cidr` matches when they target the same (field, IP address) pair on a threat.\n\n**Rule**: After processing all non-CIDR IOC matches (exact `ipv4`, `port`, `user`), collect every (field_name, IP_address) "
+}

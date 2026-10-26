@@ -1,0 +1,827 @@
+[
+ {
+  "round": 1,
+  "root": "/app",
+  "graph": {
+   "n_files": 0,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": []
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "go.mod",
+    "cmd/repro-verify/main.go",
+    "internal/mlck/checkpoint.go",
+    "internal/compare/compare.go",
+    "internal/manifest/manifest.go",
+    "internal/lineage/lineage.go",
+    "internal/report/report.go",
+    "internal/merge/merge.go"
+   ],
+   "target_symbols": [
+    "main",
+    "runVerifyCheckpoint",
+    "runCompareOutputs",
+    "runValidateManifest",
+    "runAuditLineage",
+    "runGenerateReport",
+    "runMergeCheckpoints",
+    "MLCKHeader",
+    "Tensor",
+    "Checkpoint",
+    "Dtype",
+    "parseMLCK",
+    "writeMLCK",
+    "verifyCheckpoint",
+    "compareTensors",
+    "compareCheckpoints",
+    "validateManifest",
+    "auditLineage",
+    "generateReport",
+    "mergeCheckpoints"
+   ],
+   "behavior_constraints": [
+    "CLI binary repro-verify supports subcommands verify-checkpoint, compare-outputs, validate-manifest, audit-lineage, generate-report, and merge-checkpoints.",
+    "verify-checkpoint parses MLCK binary with 16-byte header magic MLCK, version uint32 LE == 1, tensor count, metadata length, UTF-8 JSON metadata, repeated tensor records, and a 32-byte SHA-256 footer over all preceding bytes.",
+    "Dtype mapping is 0=float32 size4, 1=float64 size8, 2=int32 size4, 3=int64 size8; tensor data length must equal product(shape)*sizeof(dtype).",
+    "verify-checkpoint outputs JSON with valid, format_version, num_tensors, metadata, tensor name/dtype/shape/checksum, and file_checksum; invalid files output {valid:false,error:...}, exit 1; valid files exit 0.",
+    "Checkpoint validation fails on bad magic, unsupported version, checksum mismatch, truncation, malformed metadata, or inconsistent tensor data size.",
+    "compare-outputs requires two valid MLCK files, matches tensors by name, and supports --atol default 1e-7, --rtol default 1e-5, --mode strict|relaxed.",
+    "Comparison mismatch occurs when |a-b| > atol + rtol*|b|; strict requires zero mismatches; relaxed allows up to 0.1% outliers per tensor.",
+    "compare-outputs outputs JSON with match, mode, atol, rtol, tensor_results, missing_in_file1, missing_in_file2; overall match is true only when all tensors match and no tensors are missing in either file; exit 0 for match, 1 otherwise.",
+    "validate-manifest parses TOML and requires experiment.name non-empty, experiment.timestamp RFC3339, environment.python_version semver-like 3.x.y, environment.seed integer >=0, environment.deterministic boolean, dependencies array of tables with name and version strings, outputs.checkpoint_path non-empty, and outputs.metrics table with at least one numeric field.",
+    "validate-manifest emits warnings for missing optional environment.gpu_id, environment.cuda_version, git.commit, and git.branch; outputs valid with warnings or errors; exit 0 if valid, 1 if invalid."
+   ],
+   "affected_prior": [],
+   "summary": "This round demands a new Go CLI, repro-verify, implementing MLCK checkpoint verification, comparison, manifest validation, lineage DAG auditing, report generation, and checkpoint merging with JSON outputs and exit codes."
+  },
+  "instruction_head": "Build a command-line tool called `repro-verify` in Go that verifies the integrity and reproducibility of machine learning model checkpoints and experiment artifacts.\n\nThe tool must support these subcommands:\n\n## `repro-verify verify-checkpoint <file>`\n\nParses and validates a binary checkpoint file in the MLCK format (defined below). On success, outputs a JSON object to stdout:\n\n```json\n{\n  \"valid\": true,\n  \"format_version\": 1,\n  \"num_tensors\": 3,\n  \"metadata\": {\"name\": \"resnet50-epoch10\", \"frame"
+ },
+ {
+  "round": 2,
+  "root": "/app",
+  "graph": {
+   "n_files": 10,
+   "n_edges": 24,
+   "delta": {
+    "files_added": [
+     "cmd/repro-verify/main.go",
+     "internal/app/app.go",
+     "internal/compare/compare.go",
+     "internal/drift/drift.go",
+     "internal/lineage/lineage.go",
+     "internal/manifest/manifest.go",
+     "internal/merge/merge.go",
+     "internal/mlck/checkpoint.go",
+     "internal/report/report.go",
+     "main.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "cmd/repro-verify/main.go",
+      "internal/app/app.go"
+     ],
+     [
+      "internal/app/app.go",
+      "internal/compare/compare.go"
+     ],
+     [
+      "internal/app/app.go",
+      "internal/drift/drift.go"
+     ],
+     [
+      "internal/app/app.go",
+      "internal/lineage/lineage.go"
+     ],
+     [
+      "internal/app/app.go",
+      "internal/manifest/manifest.go"
+     ],
+     [
+      "internal/app/app.go",
+      "internal/merge/merge.go"
+     ],
+     [
+      "internal/app/app.go",
+      "internal/mlck/checkpoint.go"
+     ],
+     [
+      "internal/app/app.go",
+      "internal/report/report.go"
+     ],
+     [
+      "internal/compare/compare.go",
+      "internal/drift/drift.go"
+     ],
+     [
+      "internal/compare/compare.go",
+      "internal/merge/merge.go"
+     ],
+     [
+      "internal/compare/compare.go",
+      "internal/mlck/checkpoint.go"
+     ],
+     [
+      "internal/drift/drift.go",
+      "internal/compare/compare.go"
+     ],
+     [
+      "internal/drift/drift.go",
+      "internal/merge/merge.go"
+     ],
+     [
+      "internal/drift/drift.go",
+      "internal/mlck/checkpoint.go"
+     ],
+     [
+      "internal/lineage/lineage.go",
+      "internal/mlck/checkpoint.go"
+     ],
+     [
+      "internal/manifest/manifest.go",
+      "internal/mlck/checkpoint.go"
+     ],
+     [
+      "internal/merge/merge.go",
+      "internal/compare/compare.go"
+     ],
+     [
+      "internal/merge/merge.go",
+      "internal/drift/drift.go"
+     ],
+     [
+      "internal/merge/merge.go",
+      "internal/mlck/checkpoint.go"
+     ],
+     [
+      "internal/report/report.go",
+      "internal/compare/compare.go"
+     ],
+     [
+      "internal/report/report.go",
+      "internal/lineage/lineage.go"
+     ],
+     [
+      "internal/report/report.go",
+      "internal/manifest/manifest.go"
+     ],
+     [
+      "internal/report/report.go",
+      "internal/mlck/checkpoint.go"
+     ],
+     [
+      "main.go",
+      "internal/app/app.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/mlck/checkpoint.go",
+     "pagerank": 0.272082,
+     "fan_in": 7,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/compare/compare.go",
+     "pagerank": 0.130696,
+     "fan_in": 4,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/drift/drift.go",
+     "pagerank": 0.122313,
+     "fan_in": 3,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/merge/merge.go",
+     "pagerank": 0.122313,
+     "fan_in": 3,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/app/app.go",
+     "pagerank": 0.102943,
+     "fan_in": 2,
+     "fan_out": 7
+    },
+    {
+     "file": "internal/lineage/lineage.go",
+     "pagerank": 0.061385,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "internal/manifest/manifest.go",
+     "pagerank": 0.061385,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "internal/report/report.go",
+     "pagerank": 0.050627,
+     "fan_in": 1,
+     "fan_out": 4
+    },
+    {
+     "file": "cmd/repro-verify/main.go",
+     "pagerank": 0.038127,
+     "fan_in": 0,
+     "fan_out": 1
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.038127,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "internal/manifest/manifest.go",
+    "internal/app/app.go"
+   ],
+   "target_symbols": [
+    "parseTOML",
+    "parseTOMLValue",
+    "splitArrayElements",
+    "Run",
+    "parseMixedArgs",
+    "runCompareOutputs",
+    "runMergeCheckpoints",
+    "runDriftAnalysis",
+    "runVerifyCheckpoint",
+    "runValidateManifest"
+   ],
+   "behavior_constraints": [
+    "Root-level dotted TOML keys such as experiment.name = \"test\" without an [experiment] header resolve into nested fields instead of disappearing.",
+    "Inline TOML comments after values are stripped and do not become part of parsed values.",
+    "Existing valid manifest validation and all existing correct command outputs remain identical.",
+    "verify-checkpoint invalid checkpoint JSON and validate-manifest invalid manifest JSON payloads remain unchanged.",
+    "Usage errors, unreadable inputs, invalid arguments, and error paths for compare-outputs, merge-checkpoints, and drift-analysis output {\"error\":\"<message>\"} on stdout and exit code 1.",
+    "Top-level no-argument and unknown-subcommand cases output {\"error\":\"<message>\"} on stdout and exit code 1.",
+    "verify-checkpoint and validate-manifest non-content usage/unreadable errors use the generic {\"error\":\"<message>\"} shape while invalid-content payloads stay unchanged.",
+    "No specified error path emits only plain text to stderr."
+   ],
+   "affected_prior": [
+    "internal/manifest/manifest.go TOML parser (parseTOML, parseTOMLValue, splitArrayElements) and manifest validation behavior",
+    "internal/app/app.go command dispatch and error reporting (Run, runCompareOutputs, runMergeCheckpoints, runDriftAnalysis)",
+    "compare-outputs, merge-checkpoints, and drift-analysis plain-stderr error output",
+    "verify-checkpoint and validate-manifest command-specific invalid-content JSON payloads (must be preserved)"
+   ],
+   "summary": "This round fixes root-level dotted TOML key and inline comment parsing and standardizes CLI error reporting to JSON error objects on stdout while preserving existing command-specific failure payloads and correct outputs."
+  },
+  "instruction_head": "The TOML parsing is fragile. Dotted keys at root level (`experiment.name = \"test\"` without a `[experiment]` header) don't resolve \u2014 the field just vanishes. Inline comments after values (`name = \"test\" # comment`) bleed into the parsed value. Fix both.\n\nError reporting is inconsistent across commands. `verify-checkpoint` and `validate-manifest` already have command-specific JSON failure payloads for invalid checkpoint or manifest content; keep those existing payloads unchanged. For usage errors,"
+ },
+ {
+  "round": 3,
+  "root": "/app",
+  "graph": {
+   "n_files": 10,
+   "n_edges": 24,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/mlck/checkpoint.go",
+     "pagerank": 0.272082,
+     "fan_in": 7,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/compare/compare.go",
+     "pagerank": 0.130696,
+     "fan_in": 4,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/drift/drift.go",
+     "pagerank": 0.122313,
+     "fan_in": 3,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/merge/merge.go",
+     "pagerank": 0.122313,
+     "fan_in": 3,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/app/app.go",
+     "pagerank": 0.102943,
+     "fan_in": 2,
+     "fan_out": 7
+    },
+    {
+     "file": "internal/lineage/lineage.go",
+     "pagerank": 0.061385,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "internal/manifest/manifest.go",
+     "pagerank": 0.061385,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "internal/report/report.go",
+     "pagerank": 0.050627,
+     "fan_in": 1,
+     "fan_out": 4
+    },
+    {
+     "file": "cmd/repro-verify/main.go",
+     "pagerank": 0.038127,
+     "fan_in": 0,
+     "fan_out": 1
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.038127,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "internal/report/report.go",
+    "internal/drift/drift.go",
+    "internal/app/app.go"
+   ],
+   "target_symbols": [
+    "Generate",
+    "quickLineageCheck",
+    "Analyze",
+    "runGenerateReport",
+    "runDriftAnalysis",
+    "Compare",
+    "Audit"
+   ],
+   "behavior_constraints": [
+    "generate-report's comparison section must fail (match=false) when either checkpoint has tensors the other lacks, mirroring compare-outputs' missing_in_file1/missing_in_file2 handling",
+    "generate-report's comparison summary must include a count of missing tensors (e.g. '2/3 tensors differ, 1 tensors missing')",
+    "drift-analysis output 'tensors' list must be sorted alphabetically by tensor name",
+    "drift-analysis output 'skipped_tensors' list must be sorted alphabetically by tensor name",
+    "generate-report's lineage section must use the same validation logic as audit-lineage, producing an 'errors' array with identical error strings to audit-lineage",
+    "generate-report lineage output on failure must be {\"valid\": false, \"errors\": [...]} rather than just {\"valid\": false}",
+    "drift-analysis and generate-report outputs must be reproducible across runs given identical inputs"
+   ],
+   "affected_prior": [
+    "Generate (internal/report/report.go) - comparison and lineage sections from round 1",
+    "quickLineageCheck (internal/report/report.go) - simplified lineage check to be removed/replaced",
+    "Analyze (internal/drift/drift.go) - non-deterministic map iteration from round 1",
+    "runGenerateReport (internal/app/app.go) - report handler from rounds 1-2",
+    "runDriftAnalysis (internal/app/app.go) - drift handler from rounds 1-2"
+   ],
+   "summary": "This round fixes generate-report to fail on missing tensors in its comparison, sorts drift-analysis tensor lists alphabetically, and replaces the simplified quickLineageCheck with full audit-lineage validation so reports include detailed errors."
+  },
+  "instruction_head": "The comparison section in `generate-report` silently ignores tensor name mismatches between checkpoint files. If one file has extra tensors the other doesn't, the report still says `\"match\": true` as long as the shared tensors agree. That's wrong \u2014 `compare-outputs` correctly handles this by tracking `missing_in_file1` and `missing_in_file2`. Fix `generate-report` to match: any missing tensor should make the comparison fail, and the summary should mention it (e.g. `\"2/3 tensors differ, 1 tensors"
+ },
+ {
+  "round": 4,
+  "root": "/app",
+  "graph": {
+   "n_files": 10,
+   "n_edges": 24,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/mlck/checkpoint.go",
+     "pagerank": 0.272082,
+     "fan_in": 7,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/compare/compare.go",
+     "pagerank": 0.130696,
+     "fan_in": 4,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/drift/drift.go",
+     "pagerank": 0.122313,
+     "fan_in": 3,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/merge/merge.go",
+     "pagerank": 0.122313,
+     "fan_in": 3,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/app/app.go",
+     "pagerank": 0.102943,
+     "fan_in": 2,
+     "fan_out": 7
+    },
+    {
+     "file": "internal/lineage/lineage.go",
+     "pagerank": 0.061385,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "internal/manifest/manifest.go",
+     "pagerank": 0.061385,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "internal/report/report.go",
+     "pagerank": 0.050627,
+     "fan_in": 1,
+     "fan_out": 4
+    },
+    {
+     "file": "cmd/repro-verify/main.go",
+     "pagerank": 0.038127,
+     "fan_in": 0,
+     "fan_out": 1
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.038127,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "internal/compare/compare.go",
+    "internal/app/app.go"
+   ],
+   "target_symbols": [
+    "Compare",
+    "compareTensors",
+    "shapesEqual",
+    "runCompareOutputs",
+    "parseMixedArgs"
+   ],
+   "behavior_constraints": [
+    "Per-tensor comparison result must include \"shape_mismatch\": true when two same-named tensors have different shapes",
+    "Shape-mismatched tensor pairs must be treated as non-matching",
+    "Top-level compare-outputs \"match\" must be false when any shape mismatch occurs",
+    "When --histogram flag is passed, each per-tensor result must include a \"diff_histogram\" object with buckets: \"exact\", \"<1e-7\", \"<1e-5\", \"<1e-3\", \"<1\", \">=1\"",
+    "Histogram buckets count element-wise absolute differences",
+    "Top-level comparison result must include \"histogram_enabled\": true when --histogram is active",
+    "No diff_histogram is produced for shape-mismatched tensors"
+   ],
+   "affected_prior": [
+    "compare-outputs command (round 1)",
+    "Compare (round 1)",
+    "compareTensors (round 1)",
+    "runCompareOutputs (round 1)",
+    "parseMixedArgs (round 2)"
+   ],
+   "summary": "This round adds shape-mismatch detection to compare-outputs (reporting shape_mismatch and forcing match=false) and a new --histogram flag that bins element-wise absolute differences into six buckets per tensor."
+  },
+  "instruction_head": "`compare-outputs` doesn't handle the case where tensors sharing a name have different shapes (e.g., after a model architecture change) \u2014 it either crashes or silently compares misaligned values. Add a shape check: if the shapes don't match, the comparison should report `\"shape_mismatch\": true` in the per-tensor result and treat the pair as non-matching. Since the overall `compare-outputs` result depends on individual tensor comparisons, shape mismatches should naturally cause the top-level `\"mat"
+ },
+ {
+  "round": 5,
+  "root": "/app",
+  "graph": {
+   "n_files": 10,
+   "n_edges": 24,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/mlck/checkpoint.go",
+     "pagerank": 0.272082,
+     "fan_in": 7,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/compare/compare.go",
+     "pagerank": 0.130696,
+     "fan_in": 4,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/drift/drift.go",
+     "pagerank": 0.122313,
+     "fan_in": 3,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/merge/merge.go",
+     "pagerank": 0.122313,
+     "fan_in": 3,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/app/app.go",
+     "pagerank": 0.102943,
+     "fan_in": 2,
+     "fan_out": 7
+    },
+    {
+     "file": "internal/lineage/lineage.go",
+     "pagerank": 0.061385,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "internal/manifest/manifest.go",
+     "pagerank": 0.061385,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "internal/report/report.go",
+     "pagerank": 0.050627,
+     "fan_in": 1,
+     "fan_out": 4
+    },
+    {
+     "file": "cmd/repro-verify/main.go",
+     "pagerank": 0.038127,
+     "fan_in": 0,
+     "fan_out": 1
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.038127,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "internal/drift/drift.go",
+    "internal/app/app.go"
+   ],
+   "target_symbols": [
+    "Analyze",
+    "classifyConvergence",
+    "runDriftAnalysis",
+    "parseMixedArgs"
+   ],
+   "behavior_constraints": [
+    "Convergence classification must treat non-increasing consecutive step changes as \"converging\".",
+    "Convergence classification must treat non-decreasing consecutive step changes with at least one strict increase as \"diverging\".",
+    "When all step changes are identical, convergence must be classified as \"converging\".",
+    "Equal consecutive step changes must not by themselves trigger an \"oscillating\" classification when the trend is non-increasing.",
+    "Stability score must use the maximum consecutive step change as the denominator instead of the first snapshot-pair change.",
+    "drift-analysis must support a --top-k N option.",
+    "When --top-k is active, the \"tensors\" array must contain only the N tensors with the lowest stability scores, sorted by ascending stability score.",
+    "If --top-k N exceeds the number of analyzed tensors, all analyzed tensors must be returned still sorted by ascending stability score.",
+    "When --top-k is active, the result must include a \"top_k\" field set to the requested N, not the clipped returned count.",
+    "The \"skipped_tensors\", \"num_snapshots\", \"num_analyzed_tensors\", and \"overall_convergence\" fields must remain unchanged by --top-k."
+   ],
+   "affected_prior": [
+    "runDriftAnalysis",
+    "Analyze",
+    "classifyConvergence",
+    "parseMixedArgs"
+   ],
+   "summary": "This round fixes drift-analysis convergence classification and stability-score normalization, and adds a --top-k option that returns the least-stable tensors sorted by ascending stability score."
+  },
+  "instruction_head": "`drift-analysis` has two issues in how it summarizes tensor drift.\n\nFirst, convergence classification uses strict comparison, so if any two consecutive step changes happen to be exactly equal, the tensor gets classified as \"oscillating\" even when the overall trend is clearly non-increasing. Non-increasing step changes should count as \"converging\"; non-decreasing step changes (with at least one strict increase) should count as \"diverging\". When all step changes are identical, treat it as \"converg"
+ },
+ {
+  "round": 6,
+  "root": "/app",
+  "graph": {
+   "n_files": 10,
+   "n_edges": 24,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/mlck/checkpoint.go",
+     "pagerank": 0.272082,
+     "fan_in": 7,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/compare/compare.go",
+     "pagerank": 0.130696,
+     "fan_in": 4,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/drift/drift.go",
+     "pagerank": 0.122313,
+     "fan_in": 3,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/merge/merge.go",
+     "pagerank": 0.122313,
+     "fan_in": 3,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/app/app.go",
+     "pagerank": 0.102943,
+     "fan_in": 2,
+     "fan_out": 7
+    },
+    {
+     "file": "internal/lineage/lineage.go",
+     "pagerank": 0.061385,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "internal/manifest/manifest.go",
+     "pagerank": 0.061385,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "internal/report/report.go",
+     "pagerank": 0.050627,
+     "fan_in": 1,
+     "fan_out": 4
+    },
+    {
+     "file": "cmd/repro-verify/main.go",
+     "pagerank": 0.038127,
+     "fan_in": 0,
+     "fan_out": 1
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.038127,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "internal/app/app.go",
+    "internal/drift/drift.go"
+   ],
+   "target_symbols": [
+    "runDriftAnalysis",
+    "Analyze",
+    "AnalyzeWithTopK",
+    "parseMixedArgs"
+   ],
+   "behavior_constraints": [
+    "drift-analysis accepts a new --threshold <value> flag.",
+    "When --threshold is provided, each tensor entry includes a \"drifting\" boolean: true iff that tensor's \"max_change\" exceeds the threshold, false otherwise.",
+    "When --threshold is provided, the top-level result includes \"drift_threshold\" set to the threshold value and \"num_drifting_tensors\" counting drifting tensors.",
+    "When --threshold is combined with --top-k, \"num_drifting_tensors\" reflects all analyzed tensors, not just the filtered top-k subset.",
+    "When --threshold is combined with --top-k, the \"drifting\" field still appears on tensors that survive the top-k filter.",
+    "When --threshold is not provided, none of \"drifting\", \"drift_threshold\", or \"num_drifting_tensors\" appear in the output (not even as false or 0)."
+   ],
+   "affected_prior": [
+    "runDriftAnalysis",
+    "Analyze",
+    "AnalyzeWithTopK",
+    "parseMixedArgs"
+   ],
+   "summary": "This round adds a --threshold flag to drift-analysis that marks per-tensor drifting status and reports the threshold plus a count of drifting tensors across all analyzed tensors (independent of top-k filtering), emitting none of these fields when the flag is absent."
+  },
+  "instruction_head": "Add a `--threshold <value>` flag to `drift-analysis`. When present, each analyzed tensor's result should include a `\"drifting\"` field: `true` if the tensor's `\"max_change\"` exceeds the threshold, `false` otherwise. The top-level result should include `\"drift_threshold\"` set to the threshold value and `\"num_drifting_tensors\"` counting how many analyzed tensors are drifting.\n\nWhen combined with `--top-k`, the `\"num_drifting_tensors\"` count must reflect all analyzed tensors, not just those returned"
+ },
+ {
+  "round": 7,
+  "root": "/app",
+  "graph": {
+   "n_files": 10,
+   "n_edges": 24,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/mlck/checkpoint.go",
+     "pagerank": 0.272082,
+     "fan_in": 7,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/compare/compare.go",
+     "pagerank": 0.130696,
+     "fan_in": 4,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/drift/drift.go",
+     "pagerank": 0.122313,
+     "fan_in": 3,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/merge/merge.go",
+     "pagerank": 0.122313,
+     "fan_in": 3,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/app/app.go",
+     "pagerank": 0.102943,
+     "fan_in": 2,
+     "fan_out": 7
+    },
+    {
+     "file": "internal/lineage/lineage.go",
+     "pagerank": 0.061385,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "internal/manifest/manifest.go",
+     "pagerank": 0.061385,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "internal/report/report.go",
+     "pagerank": 0.050627,
+     "fan_in": 1,
+     "fan_out": 4
+    },
+    {
+     "file": "cmd/repro-verify/main.go",
+     "pagerank": 0.038127,
+     "fan_in": 0,
+     "fan_out": 1
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.038127,
+     "fan_in": 0,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "internal/lineage/lineage.go",
+    "internal/report/report.go",
+    "internal/app/app.go"
+   ],
+   "target_symbols": [
+    "Audit",
+    "detectCycle",
+    "Generate",
+    "runAuditLineage",
+    "runGenerateReport"
+   ],
+   "behavior_constraints": [
+    "audit-lineage must NOT flag a child whose timestamp equals its parent's timestamp as a timestamp violation; only strictly-earlier child timestamps are violations",
+    "generate-report's lineage validation path must apply the same relaxed timestamp rule (equal timestamps allowed, only child-before-parent flagged)",
+    "When lineage is valid, audit-lineage JSON result must include an `experiment_depths` field mapping each experiment ID to its integer depth in the DAG with roots at depth 1",
+    "When lineage is valid, audit-lineage JSON result must include a `max_width` field equal to the maximum count of experiments sharing any single depth level",
+    "Existing cycle detection and other lineage audit behaviors must remain intact"
+   ],
+   "affected_prior": [
+    "Audit (round 1 lineage auditing)",
+    "Generate (round 1/3 report generation with lineage validation)",
+    "runAuditLineage (round 3 switched to full audit-lineage)",
+    "runGenerateReport (round 3 fixed missing-tensor failure)"
+   ],
+   "summary": "This round relaxes timestamp validation in audit-lineage and generate-report to allow equal parent/child timestamps, and adds experiment_depths and max_width summary fields to a valid audit-lineage result."
+  },
+  "instruction_head": "The timestamp validation in `audit-lineage` is too strict: it rejects experiments whose timestamps are exactly equal to their parent's timestamp. When experiments are spawned immediately after their parent, second-level precision often makes them share the same timestamp. Only flag timestamps where the child is strictly *before* the parent -- equal timestamps should be allowed.\n\nThe same overly-strict timestamp logic also exists in `generate-report`'s lineage validation path. Fix it there as wel"
+ }
+]

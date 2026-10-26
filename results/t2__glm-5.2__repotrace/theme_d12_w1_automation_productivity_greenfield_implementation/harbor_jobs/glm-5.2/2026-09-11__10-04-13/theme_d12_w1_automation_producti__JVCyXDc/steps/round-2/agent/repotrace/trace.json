@@ -1,0 +1,118 @@
+[
+ {
+  "round": 1,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [
+     "cmd/flowr/main.go"
+    ],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/flowr/main.go",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/flowr/main.go",
+    "go.mod"
+   ],
+   "target_symbols": [
+    "main",
+    "parseWorkflow"
+   ],
+   "behavior_constraints": [
+    "flowr executable must be compiled and available on PATH, invocable from any working directory",
+    "flowr run <workflow.yaml> subcommand accepts --max-parallel (default 4), --run-id, --only-step, --skip-step flags",
+    "When --run-id is omitted, generate run-YYYYmmddTHHMMSSZ-<6 lowercase hex> from a random source",
+    "Workflow YAML parsing enforces: version, optional env, steps list with name/cmd/needs/env/retries/timeout_ms/on_failure/matrix keys only",
+    "Unknown top-level keys and unknown step keys are validation errors",
+    "Step names must match ^[A-Za-z0-9_][A-Za-z0-9_.-]*$; [ and ] are reserved",
+    "env keys (workflow and step) must match ^[A-Za-z_][A-Za-z0-9_]*$",
+    "cmd must be non-empty and contain no NUL byte",
+    "retries and timeout_ms must be non-negative integers",
+    "on_failure must be exactly halt or continue (default halt)"
+   ],
+   "affected_prior": [],
+   "summary": "Round 1 demands a complete from-scratch implementation of the flowr workflow orchestrator CLI with YAML workflow parsing, matrix expansion, DAG scheduling under bounded parallelism, retries, timeouts, cancellation, selective filters, and structured reporting."
+  },
+  "instruction_head": "# flowr \u2014 workflow orchestrator\n\nBuild a command-line workflow orchestrator called `flowr`. It reads a YAML workflow file that describes a DAG of shell commands and runs those commands in dependency order with bounded parallelism, matrix-based step fan-out, variable interpolation, retries, timeouts, graceful cancellation, selective execution filters, and a structured run report plus an append-only event log.\n\nThe Go toolchain and a Go module named `flowr` requiring `gopkg.in/yaml.v3 v3.0.1` are "
+ },
+ {
+  "round": 2,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/flowr/main.go",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/flowr/main.go",
+    "go.mod"
+   ],
+   "target_symbols": [
+    "main",
+    "parseWorkflow",
+    "computeCacheKey",
+    "lookupCache",
+    "writeCacheEntry",
+    "cachePrune",
+    "runWorkflow",
+    "expandInputs",
+    "sha256File",
+    "executeStep",
+    "buildReport"
+   ],
+   "behavior_constraints": [
+    "Steps may declare optional `inputs` (file globs: *, **, or exact paths) and `outputs` (exact file paths) lists",
+    "Inputs match only regular files; directories and non-regular-file symlinks are ignored",
+    "Literal input pattern with no matching file => cache-key failure: exit_code null, status 'failed', step never launches shell, counts as failed for halt/continue and global run status",
+    "Steps with neither inputs nor outputs are not cacheable and always execute as before",
+    "Cache key = SHA-256 of deterministic JSON serialization of {cmd, env, matrix, inputs, outputs} with keys in that exact order, no extra whitespace, UTF-8",
+    "cmd field uses final interpolated command, or JSON array of pipe stages for pipelined steps",
+    "env field is sorted-by-key list of [key,value] pairs composed of workflow env + step env + FLOWR_STEP and FLOWR_MATRIX_* builtins; parent-process env and run-dependent FLOWR_* (notably FLOWR_RUN_ID) are excluded from hash but still exported",
+    "inputs field is sorted-by-path-ascending list of [path, sha256(content)] pairs",
+    "outputs field is sorted-ascending list of declared output paths",
+    "Cache entries stored at .flowr/cache/<key>.json with {key, created_at (RFC-3339 millisecond UTC), outputs:[{path, sha256}]}"
+   ],
+   "affected_prior": [
+    "main",
+    "parseWorkflow",
+    "runWorkflow/executeStep",
+    "DAG scheduler",
+    "report.json generation",
+    "events log",
+    "step directory/meta.json writer",
+    "go.mod"
+   ],
+   "summary": "Round 2 layers a content-addressed build cache (inputs/outputs globs, SHA-256 cache key, .flowr/cache entries, cache hits/misses, --no-cache flag, flowr cache prune), resource reservations with peak tracking, and a pipelined command form onto the existing flowr orchestrator without regressing prior behavior."
+  },
+  "instruction_head": "# flowr \u2014 incremental execution, resource reservations, and pipelines\n\nExtend the existing `flowr` orchestrator with three feature families: a content-addressed build cache that lets repeat runs skip work, resource reservations so the scheduler can respect CPU and memory budgets, and a pipelined command form for steps that want to chain programs with shell pipes. All previously specified behavior continues to hold; the additions are layered on top and must not regress any existing guarantee.\n\n##"
+ }
+]

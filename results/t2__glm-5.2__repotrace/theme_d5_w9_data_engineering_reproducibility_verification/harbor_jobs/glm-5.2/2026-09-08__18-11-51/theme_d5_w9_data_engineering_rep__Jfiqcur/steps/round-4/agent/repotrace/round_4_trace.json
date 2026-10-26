@@ -1,0 +1,113 @@
+{
+ "round": 4,
+ "root": "/app",
+ "graph": {
+  "n_files": 9,
+  "n_edges": 14,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "csvio.go",
+    "pagerank": 0.327611,
+    "fan_in": 6,
+    "fan_out": 0
+   },
+   {
+    "file": "jsonutil.go",
+    "pagerank": 0.130064,
+    "fan_in": 2,
+    "fan_out": 1
+   },
+   {
+    "file": "compare.go",
+    "pagerank": 0.096273,
+    "fan_in": 2,
+    "fan_out": 2
+   },
+   {
+    "file": "profile.go",
+    "pagerank": 0.096273,
+    "fan_in": 2,
+    "fan_out": 3
+   },
+   {
+    "file": "stats.go",
+    "pagerank": 0.089148,
+    "fan_in": 1,
+    "fan_out": 0
+   },
+   {
+    "file": "pipeline.go",
+    "pagerank": 0.075018,
+    "fan_in": 1,
+    "fan_out": 3
+   },
+   {
+    "file": "expr.go",
+    "pagerank": 0.061871,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "main.go",
+    "pagerank": 0.061871,
+    "fan_in": 0,
+    "fan_out": 4
+   },
+   {
+    "file": "schema.go",
+    "pagerank": 0.061871,
+    "fan_in": 0,
+    "fan_out": 1
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "main.go",
+   "validate.go",
+   "pipeline.go",
+   "schema.go"
+  ],
+  "target_symbols": [
+   "main",
+   "cmdValidate",
+   "runValidate",
+   "Violation",
+   "ValidationReport",
+   "LoadSchema",
+   "ColumnSpec",
+   "validateRow",
+   "runPipeline",
+   "crossjoin",
+   "checkpoint",
+   "rowHash",
+   "validateStep"
+  ],
+  "behavior_constraints": [
+   "dpipe validate --input <path> --schema <path> --output <path> reads CSV and JSON schema and writes 2-space indented JSON with a trailing newline.",
+   "Schema columns map supports type int/float/string, required, min, max, pattern, unique, enum, and top-level strict.",
+   "Non-empty values must parse with strconv.ParseInt for int and strconv.ParseFloat for float; empty values violate only when required is true.",
+   "Min/max are checked only after type check passes; pattern applies to string type only; enum compares raw CSV string; unique flags duplicate non-empty values per column.",
+   "Schema columns missing from CSV produce one column_missing violation each; strict CSV columns not in schema produce one strict violation each.",
+   "Violation object has column, row (int or null), rule, value (string or null), message; row is null for unique/column_missing/strict and value is null for required/column_missing/strict.",
+   "Messages are exactly: type=expected <type>, got \"<value>\"; required=value is required; min=value <value> is below minimum <min>; max=value <value> exceeds maximum <max>; pattern=value \"<value>\" does not match pattern <pattern>; enum=value \"<value>\" is not in allowed values [<values joined with comma and space>]; unique=duplicate value \"<value>\" (first at row <N>, repeated at row <M>); column_missing=column \"<name>\" defined in schema but missing from data; strict=column \"<name>\" not defined in schema.",
+   "Violation ordering: CSV header order for present columns, then column_missing in schema key order, then strict in header order; within a column: type, required, min, max, pattern, enum, unique; within same column+rule row ascending with null after numbered rows.",
+   "Summary contains total_violations, columns_checked (schema columns present in CSV), and rows_checked (data row count); valid is true iff total_violations is 0.",
+   "Missing input or schema file exits 1 with ERROR: file not found: <path>; invalid JSON schema exits 1 with ERROR: invalid schema: <path>."
+  ],
+  "affected_prior": [
+   "main.go command dispatch and error handling (main, fail, cmd* functions)",
+   "pipeline.go runPipeline transform and step dispatch",
+   "schema.go LoadSchema/validateRow/ValidateRows validation behavior if reused or extended for detailed violations"
+  ],
+  "summary": "Add a standalone validate command, crossjoin and checkpoint transforms, and a pipeline validate step that emit detailed schema violation reports."
+ },
+ "instruction_head": "Add the following capabilities to `dpipe`.\n\n## New command: `validate`\n\n`dpipe validate --input <path> --schema <path> --output <path>`\n\nValidates a CSV data file against a JSON schema definition and reports all violations.\n\n### Schema format\n\n```json\n{\n  \"columns\": {\n    \"age\": {\"type\": \"int\", \"min\": 0, \"max\": 150, \"required\": true},\n    \"email\": {\"type\": \"string\", \"pattern\": \"^[^@]+@[^@]+$\", \"unique\": true},\n    \"status\": {\"type\": \"string\", \"enum\": [\"active\", \"inactive\"]}\n  },\n  \"strict\": fals"
+}

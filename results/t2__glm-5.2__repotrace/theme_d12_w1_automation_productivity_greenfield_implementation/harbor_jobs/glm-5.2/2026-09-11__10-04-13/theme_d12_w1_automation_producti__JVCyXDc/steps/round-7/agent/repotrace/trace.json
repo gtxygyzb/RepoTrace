@@ -1,0 +1,672 @@
+[
+ {
+  "round": 1,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [
+     "cmd/flowr/main.go"
+    ],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/flowr/main.go",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/flowr/main.go",
+    "go.mod"
+   ],
+   "target_symbols": [
+    "main",
+    "parseWorkflow"
+   ],
+   "behavior_constraints": [
+    "flowr executable must be compiled and available on PATH, invocable from any working directory",
+    "flowr run <workflow.yaml> subcommand accepts --max-parallel (default 4), --run-id, --only-step, --skip-step flags",
+    "When --run-id is omitted, generate run-YYYYmmddTHHMMSSZ-<6 lowercase hex> from a random source",
+    "Workflow YAML parsing enforces: version, optional env, steps list with name/cmd/needs/env/retries/timeout_ms/on_failure/matrix keys only",
+    "Unknown top-level keys and unknown step keys are validation errors",
+    "Step names must match ^[A-Za-z0-9_][A-Za-z0-9_.-]*$; [ and ] are reserved",
+    "env keys (workflow and step) must match ^[A-Za-z_][A-Za-z0-9_]*$",
+    "cmd must be non-empty and contain no NUL byte",
+    "retries and timeout_ms must be non-negative integers",
+    "on_failure must be exactly halt or continue (default halt)"
+   ],
+   "affected_prior": [],
+   "summary": "Round 1 demands a complete from-scratch implementation of the flowr workflow orchestrator CLI with YAML workflow parsing, matrix expansion, DAG scheduling under bounded parallelism, retries, timeouts, cancellation, selective filters, and structured reporting."
+  },
+  "instruction_head": "# flowr \u2014 workflow orchestrator\n\nBuild a command-line workflow orchestrator called `flowr`. It reads a YAML workflow file that describes a DAG of shell commands and runs those commands in dependency order with bounded parallelism, matrix-based step fan-out, variable interpolation, retries, timeouts, graceful cancellation, selective execution filters, and a structured run report plus an append-only event log.\n\nThe Go toolchain and a Go module named `flowr` requiring `gopkg.in/yaml.v3 v3.0.1` are "
+ },
+ {
+  "round": 2,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/flowr/main.go",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/flowr/main.go",
+    "go.mod"
+   ],
+   "target_symbols": [
+    "main",
+    "parseWorkflow",
+    "computeCacheKey",
+    "lookupCache",
+    "writeCacheEntry",
+    "cachePrune",
+    "runWorkflow",
+    "expandInputs",
+    "sha256File",
+    "executeStep",
+    "buildReport"
+   ],
+   "behavior_constraints": [
+    "Steps may declare optional `inputs` (file globs: *, **, or exact paths) and `outputs` (exact file paths) lists",
+    "Inputs match only regular files; directories and non-regular-file symlinks are ignored",
+    "Literal input pattern with no matching file => cache-key failure: exit_code null, status 'failed', step never launches shell, counts as failed for halt/continue and global run status",
+    "Steps with neither inputs nor outputs are not cacheable and always execute as before",
+    "Cache key = SHA-256 of deterministic JSON serialization of {cmd, env, matrix, inputs, outputs} with keys in that exact order, no extra whitespace, UTF-8",
+    "cmd field uses final interpolated command, or JSON array of pipe stages for pipelined steps",
+    "env field is sorted-by-key list of [key,value] pairs composed of workflow env + step env + FLOWR_STEP and FLOWR_MATRIX_* builtins; parent-process env and run-dependent FLOWR_* (notably FLOWR_RUN_ID) are excluded from hash but still exported",
+    "inputs field is sorted-by-path-ascending list of [path, sha256(content)] pairs",
+    "outputs field is sorted-ascending list of declared output paths",
+    "Cache entries stored at .flowr/cache/<key>.json with {key, created_at (RFC-3339 millisecond UTC), outputs:[{path, sha256}]}"
+   ],
+   "affected_prior": [
+    "main",
+    "parseWorkflow",
+    "runWorkflow/executeStep",
+    "DAG scheduler",
+    "report.json generation",
+    "events log",
+    "step directory/meta.json writer",
+    "go.mod"
+   ],
+   "summary": "Round 2 layers a content-addressed build cache (inputs/outputs globs, SHA-256 cache key, .flowr/cache entries, cache hits/misses, --no-cache flag, flowr cache prune), resource reservations with peak tracking, and a pipelined command form onto the existing flowr orchestrator without regressing prior behavior."
+  },
+  "instruction_head": "# flowr \u2014 incremental execution, resource reservations, and pipelines\n\nExtend the existing `flowr` orchestrator with three feature families: a content-addressed build cache that lets repeat runs skip work, resource reservations so the scheduler can respect CPU and memory budgets, and a pipelined command form for steps that want to chain programs with shell pipes. All previously specified behavior continues to hold; the additions are layered on top and must not regress any existing guarantee.\n\n##"
+ },
+ {
+  "round": 3,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/flowr/main.go",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/flowr/main.go",
+    "go.mod"
+   ],
+   "target_symbols": [
+    "main",
+    "parseWorkflow",
+    "RetryPolicy",
+    "parseRetryPolicy",
+    "computeRetryDelay",
+    "evaluateWhenExpression",
+    "parseWhenExpression",
+    "runHooks",
+    "expandForeach",
+    "structuredOutputs",
+    "resumeRun"
+   ],
+   "behavior_constraints": [
+    "retry and retries are mutually exclusive on a step (exit 4)",
+    "retry must be a mapping; unknown keys inside are a validation error (exit 4)",
+    "retry.count is required when retry: is declared (exit 4)",
+    "retry.count, retry.initial_ms, retry.max_ms must be integers >= 0 (exit 4)",
+    "retry.backoff must be one of fixed|linear|exponential (exit 4)",
+    "retry.jitter must be a boolean (exit 4)",
+    "fixed delay = initial_ms; linear delay = initial_ms*n; exponential delay = initial_ms*2^(n-1)",
+    "delay clamped to [0, max_ms] when max_ms>0; no upper bound when max_ms==0",
+    "jitter subtracts a pseudo-random integer in [0, delay/4] from delay, never below 0, never exceeding max_ms clamp",
+    "scalar retries: form still uses fixed backoff with initial_ms=100 matching R1 exactly"
+   ],
+   "affected_prior": [
+    "R1 retries: scalar form must coexist with structured retry: and remain fixed/initial_ms=100",
+    "R1/R2 report.json schema: new retry_attempts field on every step entry, conditionally_skipped status with its neutral field set",
+    "R1/R2 events.ndjson: new step_conditionally_skipped event; retry_delay_ms field on retry step_started events",
+    "R1/R2 DAG scheduler: must evaluate when before launch, treat conditionally-skipped dependents as eligible, exclude skipped steps from order_attempted",
+    "R2 content-addressed cache: conditionally-skipped steps bypass cache entirely (no lookup, no write, no cache_key file)",
+    "R2 resource reservations: conditionally-skipped steps must not reserve resources"
+   ],
+   "summary": "Round 3 adds structured retry policies with backoff/jitter, conditional `when:` steps with a conditionally_skipped status, workflow-level hooks, plus (named but underspecified in the visible text) foreach expansion, structured outputs, and resume; new report/event fields are added while all R1/R2 behavior must remain non-regressive."
+  },
+  "instruction_head": "# flowr \u2014 retry policies, conditional steps, workflow hooks, foreach expansion, structured outputs, and resume\n\nExtend the `flowr` orchestrator with six new feature families and a targeted clarification of an existing rule. All behavior specified in rounds 1 and 2 continues to hold without regression:\n\n* validation and exit codes,\n* matrix expansion rules,\n* `${VAR}` interpolation,\n* scheduling with `--max-parallel`, lexicographic tie-breaking, and resource reservations,\n* graceful cancellation "
+ },
+ {
+  "round": 4,
+  "root": "/app",
+  "graph": {
+   "n_files": 7,
+   "n_edges": 7,
+   "delta": {
+    "files_added": [
+     "cmd/flowr/expand.go",
+     "cmd/flowr/interpolate.go",
+     "cmd/flowr/parse.go",
+     "cmd/flowr/types.go",
+     "cmd/flowr/util.go",
+     "cmd/flowr/validate.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "cmd/flowr/expand.go",
+      "cmd/flowr/interpolate.go"
+     ],
+     [
+      "cmd/flowr/expand.go",
+      "cmd/flowr/parse.go"
+     ],
+     [
+      "cmd/flowr/expand.go",
+      "cmd/flowr/util.go"
+     ],
+     [
+      "cmd/flowr/expand.go",
+      "cmd/flowr/validate.go"
+     ],
+     [
+      "cmd/flowr/interpolate.go",
+      "cmd/flowr/util.go"
+     ],
+     [
+      "cmd/flowr/interpolate.go",
+      "cmd/flowr/validate.go"
+     ],
+     [
+      "cmd/flowr/validate.go",
+      "cmd/flowr/parse.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/flowr/parse.go",
+     "pagerank": 0.259066,
+     "fan_in": 2,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/flowr/util.go",
+     "pagerank": 0.16695,
+     "fan_in": 2,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/flowr/validate.go",
+     "pagerank": 0.16695,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/flowr/interpolate.go",
+     "pagerank": 0.117158,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/flowr/expand.go",
+     "pagerank": 0.096625,
+     "fan_in": 0,
+     "fan_out": 4
+    },
+    {
+     "file": "cmd/flowr/main.go",
+     "pagerank": 0.096625,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/flowr/types.go",
+     "pagerank": 0.096625,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/flowr/types.go",
+    "cmd/flowr/parse.go",
+    "cmd/flowr/validate.go",
+    "cmd/flowr/interpolate.go",
+    "cmd/flowr/main.go",
+    "cmd/flowr/util.go",
+    "cmd/flowr/expand.go"
+   ],
+   "target_symbols": [
+    "parseSecrets",
+    "parseArtifacts",
+    "validateSecrets",
+    "validateArtifact",
+    "validateArtifacts",
+    "buildRedactionTable",
+    "redactBytes",
+    "redactString",
+    "redactWriter",
+    "collectArtifacts",
+    "writePlan",
+    "interpolateFirstPass",
+    "resolveStepOutputs",
+    "outputValueToString",
+    "computeCacheKey",
+    "parseWorkflow",
+    "validateWorkflow",
+    "validateStep",
+    "expandMatrix",
+    "expandForeach"
+   ],
+   "behavior_constraints": [
+    "Top-level `secrets:` block permits only `keys`; unknown keys cause exit 4.",
+    "`keys` entries must match ^[A-Za-z_][A-Za-z0-9_]*$, be unique and non-empty; violations cause exit 4.",
+    "Each declared secret NAME is read from the parent process env at flowr run start; unset is treated as empty string; empty-string secret values are legal but never redacted.",
+    "${secret.NAME} is a separate namespace resolved in the first interpolation pass; bare ${NAME} never resolves to a secret value.",
+    "Referencing ${secret.NAME} for an undeclared secret is a validation error (exit 4) with message `undefined secret: <NAME>`.",
+    "A redaction table mapping each non-empty raw secret value to `***` is built before any byte is written to any sink (events.ndjson, report.json, meta.json, stdout, stderr, output.json, hook stdout/stderr, plan.json, orchestrator stdout/stderr).",
+    "Redaction replaces longer secret values before shorter ones, greedy and non-overlapping, byte-for-byte.",
+    "Cache-key computation uses the redacted form of secret values in env, cmd strings, and resolved step output substitutions.",
+    "Redaction applies to inherited/resumed steps (F17): events.ndjson contains a redacted snapshot, not a raw copy.",
+    "report.json gains top-level `secrets.declared` (sorted list of declared key names) and `secrets.redactions_applied` (total raw-value replacement count across all sinks; 0 when no secrets or all empty)."
+   ],
+   "affected_prior": [
+    "parseWorkflow (parse.go) \u2014 must parse top-level secrets block and per-step artifacts",
+    "validateWorkflow / validateStep (validate.go) \u2014 must validate secrets and artifacts, and reject undeclared ${secret.NAME} references",
+    "interpolateFirstPass (interpolate.go) \u2014 must resolve ${secret.NAME} as a separate namespace in the first pass, without fall-through",
+    "resolveStepOutputs / outputValueToString (interpolate.go) \u2014 output.json read-back must apply textual redaction before downstream ${step.NAME.output.KEY} resolution",
+    "computeCacheKey (main.go, R2) \u2014 must hash the redacted form of secret values",
+    "expandMatrix / expandForeach (expand.go) \u2014 must carry artifacts onto expanded cells",
+    "resume/inherited-step logic (F17, R3) \u2014 must produce redacted events.ndjson from prior run dir",
+    "main (main.go) \u2014 must build redaction table, wrap all sink writers, collect artifacts, emit secrets + per-step artifacts report fields, and write plan.json",
+    "report generation (R1/R2/R3) \u2014 gains secrets field and per-step artifacts list with neutral values for non-executed steps"
+   ],
+   "summary": "Round 4 hardens flowr for production observability by adding a top-level secrets block with ${secret.NAME} interpolation and global textual redaction across all run artifacts, per-step artifact collection with status-downgrade precedence, and dry-run plan.json generation."
+  },
+  "instruction_head": "# flowr \u2014 secrets, artifacts, and dry-run planning\n\nExtend the `flowr` orchestrator with three new feature families that harden it for production-grade workflow observability. All behavior from rounds 1, 2, and 3 continues to hold without regression:\n\n* validation rules and exit codes,\n* matrix expansion and `${VAR}` interpolation,\n* scheduling with `--max-parallel`, lexicographic tie-breaking, and resource reservations,\n* graceful cancellation (SIGTERM, 500 ms grace, SIGKILL),\n* content-address"
+ },
+ {
+  "round": 5,
+  "root": "/app",
+  "graph": {
+   "n_files": 7,
+   "n_edges": 7,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/flowr/parse.go",
+     "pagerank": 0.259066,
+     "fan_in": 2,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/flowr/util.go",
+     "pagerank": 0.16695,
+     "fan_in": 2,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/flowr/validate.go",
+     "pagerank": 0.16695,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/flowr/interpolate.go",
+     "pagerank": 0.117158,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/flowr/expand.go",
+     "pagerank": 0.096625,
+     "fan_in": 0,
+     "fan_out": 4
+    },
+    {
+     "file": "cmd/flowr/main.go",
+     "pagerank": 0.096625,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/flowr/types.go",
+     "pagerank": 0.096625,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/flowr/main.go",
+    "cmd/flowr/types.go",
+    "cmd/flowr/parse.go",
+    "cmd/flowr/validate.go",
+    "cmd/flowr/interpolate.go",
+    "cmd/flowr/expand.go"
+   ],
+   "target_symbols": [
+    "main",
+    "parseStep",
+    "parseTimeoutMs",
+    "validateStep",
+    "validateTimeoutMs",
+    "parseParams",
+    "validateParams",
+    "interpolateFirstPass",
+    "interpolateStepEnv",
+    "expandMatrix",
+    "expandForeach",
+    "emitEvent",
+    "writeJSONFile"
+   ],
+   "behavior_constraints": [
+    "timeout_ms optional on step; must be integer >= 0 else exit 4 with 'invalid timeout_ms: <value>'",
+    "timeout_ms == 0 means no deadline (identical to absent)",
+    "timeout_ms applies per-attempt; retry delays (incl. jitter) never count against it",
+    "timeout_ms applies to plain, matrix, foreach, and pipe steps; for pipe, deadline spans entire pipeline (first stage spawn to last stage exit)",
+    "timeout_ms not applicable to workflow hooks; top-level timeout_ms outside a step is exit 4 'timeout_ms is only permitted on steps'",
+    "Skipped (when:) steps never spawn so their deadline never starts",
+    "plan.json steps[*] gains timeout_ms field (echoed declared value or 0 when unspecified)",
+    "On deadline reached while process alive, run R1 graceful cancellation: SIGTERM, 500ms grace, SIGKILL",
+    "step_finished exit_code = OS-reported signal code (e.g. -15/143 or -9/137); orchestrator does not rewrite",
+    "Step record in report.json gains timed_out boolean; true iff last attempt was terminated via timeout path"
+   ],
+   "affected_prior": [
+    "R1 graceful cancellation (SIGTERM/500ms/SIGKILL) now also drives per-step timeout path",
+    "R1 step scheduling/run loop must enforce per-attempt deadline timer",
+    "R1 report.json step record gains timed_out field and 'timeout' error string",
+    "R1 report.json top-level gains timeouts_summary",
+    "R1 events.ndjson gains step_timeout record kind",
+    "R1 meta.json per-step gains timed_out field",
+    "R1 stdout/stderr flushing behavior on signal-terminated processes",
+    "R1 parseStep must parse timeout_ms field",
+    "R1 validateStep must validate timeout_ms and reject top-level timeout_ms",
+    "F12 retry policy interaction: timeout counts as attempt failure; retry delays excluded from deadline",
+    "F13 when: interaction: skipped steps never start their deadline",
+    "F15 foreach per-cell deadline",
+    "F16 output.json mechanism: error precedence chain gains 'timeout' position",
+    "F17 --resume: timeouts_summary counts only live-run timeouts; inherited steps contribute nothing",
+    "F18 secrets: --param KEY colliding with secret name is a validation error"
+   ],
+   "summary": "Round 5 adds per-step timeout_ms deadlines with per-attempt graceful cancellation, step_timeout events, and timeouts_summary recap; plus a repeatable --param KEY=VAL CLI override that injects values into the interpolation env with duplicate/secret-collision validation."
+  },
+  "instruction_head": "# flowr \u2014 per-step deadlines, CLI parameter overrides, and graph emission\n\nExtend the `flowr` orchestrator with three new feature families and one targeted correction of a previously ambiguous rule. All behavior from rounds 1 through 4 continues to hold without regression:\n\n* validation rules, exit codes (`0`/`1`/`2`/`3`/`4`/`5`), and their precise boundaries,\n* matrix expansion, `${VAR}` four-tier interpolation, and deferred `${step.NAME.output.KEY}` resolution (F16),\n* scheduling with `--max-p"
+ },
+ {
+  "round": 6,
+  "root": "/app",
+  "graph": {
+   "n_files": 7,
+   "n_edges": 7,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/flowr/parse.go",
+     "pagerank": 0.259066,
+     "fan_in": 2,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/flowr/util.go",
+     "pagerank": 0.16695,
+     "fan_in": 2,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/flowr/validate.go",
+     "pagerank": 0.16695,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/flowr/interpolate.go",
+     "pagerank": 0.117158,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/flowr/expand.go",
+     "pagerank": 0.096625,
+     "fan_in": 0,
+     "fan_out": 4
+    },
+    {
+     "file": "cmd/flowr/main.go",
+     "pagerank": 0.096625,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/flowr/types.go",
+     "pagerank": 0.096625,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/flowr/types.go",
+    "cmd/flowr/parse.go",
+    "cmd/flowr/validate.go",
+    "cmd/flowr/expand.go",
+    "cmd/flowr/interpolate.go",
+    "cmd/flowr/main.go"
+   ],
+   "target_symbols": [
+    "parseLocks",
+    "parseStepLock",
+    "parseStepLocks",
+    "validateLocks",
+    "validateStepLock",
+    "validateStepLocks",
+    "LockSpec",
+    "LockAcquisition",
+    "acquireLocks",
+    "releaseLocks",
+    "deadlockDetect",
+    "validateWorkflow",
+    "validateStep",
+    "parseStep",
+    "main"
+   ],
+   "behavior_constraints": [
+    "Top-level optional `locks:` block maps lock name to spec with keys `mode` (exclusive|shared, required) and optional `capacity` (>=1, shared-only, default 1).",
+    "Lock names must match ^[A-Za-z_][A-Za-z0-9_]*$; violations exit 4 with `invalid lock name: <NAME>`.",
+    "Unknown lock spec keys exit 4 with `unknown lock spec key: <KEY>`; invalid mode exits 4 with `invalid lock mode: <VAL>`.",
+    "Declaring capacity on an exclusive lock exits 4 with `capacity not permitted on exclusive lock: <NAME>`; duplicate lock names exit 4 with `duplicate lock: <NAME>`.",
+    "Per-step `lock:` (singular) and `locks:` (plural list) are mutually exclusive; declaring both exits 4 with `lock and locks are mutually exclusive on step: <step>`.",
+    "Singular `lock:` is shorthand for exclusive acquisition of that lock even if the lock is declared shared.",
+    "Plural `locks:` entries accept only `name` and `mode` keys; unknown name exits 4 with `unknown lock reference: <NAME>`.",
+    "Requesting shared mode on a lock declared exclusive exits 4 with `cannot request shared mode on exclusive lock: <NAME>`; requesting exclusive on a shared lock is legal.",
+    "Duplicate names within one step's `locks:` exits 4 with `duplicate lock on step: <NAME>`.",
+    "Lock acquisition is atomic under a workflow-wide mutex; requests within one step are sorted by lock name ascending before acquisition to avoid deadlock."
+   ],
+   "affected_prior": [
+    "validateWorkflow (round 1) \u2014 must validate new top-level locks block.",
+    "validateStep (round 1) \u2014 must validate per-step lock/locks fields and mutual exclusion.",
+    "parseStep (round 1) \u2014 must parse lock/locks fields.",
+    "parseWorkflow (round 1) \u2014 must parse top-level locks block.",
+    "scheduler in main.go (rounds 1-5) \u2014 must integrate lock acquisition/release, atomicity, sorting, and deadlock detection without regressing max-parallel, resource reservations, or lexicographic tie-breaking.",
+    "expandMatrix/expandForeach (rounds 1,5) \u2014 cells must carry lock requests using expanded cell names as holder identity.",
+    "retry policy execution (round 3) \u2014 release locks between attempt finish and backoff; re-acquire on next attempt.",
+    "timeout_ms graceful cancellation (round 5) \u2014 locks must be released on timeout reap and SIGKILL cancel."
+   ],
+   "summary": "Round 6 adds three extension families \u2014 F24 named locks (`locks:`/`lock:`) with declaration validation, atomic acquisition/release semantics, per-attempt re-acquisition, foreach/matrix integration, and deadlock detection, plus run comparison and static linting \u2014 layered on top of rounds 1-5 without regression."
+  },
+  "instruction_head": "# flowr \u2014 named locks, run comparison, and static linting\n\nExtend the `flowr` orchestrator with three new feature families. Nothing specified in rounds 1 through 5 changes; this round is pure extension. In particular, all of the following continue to hold without regression:\n\n* validation rules and exit codes (`0`/`1`/`2`/`3`/`4`/`5`) with their precise boundaries,\n* matrix expansion, `${VAR}` four-tier interpolation, and deferred `${step.NAME.output.KEY}` resolution,\n* scheduling with `--max-pa"
+ },
+ {
+  "round": 7,
+  "root": "/app",
+  "graph": {
+   "n_files": 7,
+   "n_edges": 7,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/flowr/parse.go",
+     "pagerank": 0.259066,
+     "fan_in": 2,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/flowr/util.go",
+     "pagerank": 0.16695,
+     "fan_in": 2,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/flowr/validate.go",
+     "pagerank": 0.16695,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/flowr/interpolate.go",
+     "pagerank": 0.117158,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/flowr/expand.go",
+     "pagerank": 0.096625,
+     "fan_in": 0,
+     "fan_out": 4
+    },
+    {
+     "file": "cmd/flowr/main.go",
+     "pagerank": 0.096625,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/flowr/types.go",
+     "pagerank": 0.096625,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/flowr/main.go",
+    "cmd/flowr/types.go",
+    "cmd/flowr/parse.go",
+    "cmd/flowr/validate.go",
+    "cmd/flowr/expand.go"
+   ],
+   "target_symbols": [
+    "main",
+    "validateRunID",
+    "parseWorkflowBytes",
+    "parseStep",
+    "parseStepTags",
+    "validateWorkflow",
+    "validateStep",
+    "validateStepTags",
+    "Step.Tags",
+    "Budget",
+    "Workflow.Budget",
+    "parseBudget",
+    "validateBudget",
+    "enforceRunBudget",
+    "filterStepsByTag",
+    "expandMatrix",
+    "expandForeach"
+   ],
+   "behavior_constraints": [
+    "C3 changes the --run-id validator regex to ^[A-Za-z0-9_.\\-]+$ while still requiring non-empty values; empty, leading dot, trailing dot, exactly . or .., and any two-or-more consecutive dots exit 4 with invalid --run-id: <raw>.",
+    "Dotted but otherwise legal ids such as foo.bar, dA.1, and v1.2.3-rc.0 are accepted and used verbatim; generated default ids remain run-YYYYmmddTHHMMSSZ-<6hex> with no dot.",
+    "The same run-id validator and edge checks apply to --run-id and prior-run-id positionals for flowr run, flowr run --resume, flowr replay, and flowr diff; malformed values exit 4 with invalid --run-id: <raw>.",
+    "For flowr diff, a malformed run-id error wins over the argument-count message when two args are supplied but one is malformed; the distinct-id error fires only on exact byte equality.",
+    "Resumed runs still require the new run id to differ byte-for-byte from the prior id; both ids may contain dots.",
+    "FLOWR_RUN_ID, run_started/run_resumed/run_finished events, and report.run_id carry the final run id verbatim, including dots, with no escaping or normalization; cache keys are unaffected.",
+    "Steps may declare a free-form tags: string list; tags are parsed, validated, and preserved through matrix/foreach expansion.",
+    "flowr run accepts CLI tag filtering; when a filter is supplied only matching steps execute, and with no filter all steps run as before.",
+    "Workflows may declare run-level budgets; execution tracks usage, enforces budget limits, and reports budget status/summary, with neutral values for older reports.",
+    "All R1-R6 validation rules, exit codes, scheduling, caching, interpolation, hooks, retries, when, foreach, outputs, secrets, artifacts, dry-run, graph, locks, diff, and lint behavior remains unchanged except the C3 acceptance of dotted run ids."
+   ],
+   "affected_prior": [
+    "R1 --run-id validator and default run-id generation in main",
+    "R1 FLOWR_RUN_ID builtin environment injection/interpolation",
+    "F17 --resume run-id distinctness check",
+    "F25 flowr diff run-id argument validation and error precedence",
+    "flowr replay prior-run-id validation",
+    "R1 parseStep/validateStep for new step tags",
+    "F15 matrix/foreach expansion for carrying tags through expanded cells",
+    "R2 resource reservation/scheduling accounting for run-level budgets",
+    "R1-R3 regression tests that asserted rejection of dotted --run-id values"
+   ],
+   "summary": "Round 7 adds step tags with CLI tag filtering, run-level budgets, and overrides the R1 --run-id validator to permit dotted ids while rejecting path-traversal dot edge cases."
+  },
+  "instruction_head": "# flowr \u2014 step tags, run-level budgets, and a targeted override of the R1 run-id validator\n\nExtend the `flowr` orchestrator with two new feature families (F27, F28) and one deliberate, narrowly-scoped **conflict** (C3) that overrides a single rule first specified in R1. **Nothing specified in rounds 1 through 6 changes EXCEPT the single C3 override documented below.** In particular, all of the following continue to hold without regression:\n\n* validation rules and exit codes (`0`/`1`/`2`/`3`/`4`/"
+ }
+]

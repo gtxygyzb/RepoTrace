@@ -1,0 +1,88 @@
+{
+ "round": 5,
+ "root": "/app",
+ "graph": {
+  "n_files": 5,
+  "n_edges": 1,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "internal/memtable/memtable.go",
+    "pagerank": 0.316239,
+    "fan_in": 1,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/mvcc/seqnum.go",
+    "pagerank": 0.17094,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/mvcc/snapshot.go",
+    "pagerank": 0.17094,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/tx/transaction.go",
+    "pagerank": 0.17094,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/wal/wal.go",
+    "pagerank": 0.17094,
+    "fan_in": 0,
+    "fan_out": 1
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "internal/engine/engine.go",
+   "cmd/kvstore/main.go",
+   "internal/memtable/memtable.go"
+  ],
+  "target_symbols": [
+   "writeSSTable",
+   "SSTableWriter",
+   "SSTableReader",
+   "readBlock",
+   "compactL0ToL1",
+   "SCAN",
+   "SNAP_SCAN",
+   "TX_SCAN",
+   "EntriesInRange"
+  ],
+  "behavior_constraints": [
+   "First entry of each data block has NO shared_prefix_len field (absent, not zero) and stores full key as before",
+   "Non-first entries in a block are laid out as: shared_prefix_len (uint16 LE) + key_len (uint32 LE) + key_suffix + val_len (uint32 LE) + value + op_type (uint8) + seqnum (uint64 LE) + expire_at (uint64 LE)",
+   "shared_prefix_len is computed against the previous entry's FULL (decompressed) key, counting shared leading bytes",
+   "key_len and key fields for non-first entries hold only the non-shared suffix bytes",
+   "Per-block CRC-32 covers the compressed block bytes exactly as written",
+   "Index section, bloom filter, footer, and range tombstone section remain unchanged in format",
+   "SCAN a z returns keys satisfying key >= a AND key < z (exclusive end)",
+   "SNAP_SCAN and TX_SCAN also use exclusive end key semantics",
+   "--reverse flag reverses only output ordering and must not change the [start, end) range boundaries",
+   "DELETE_RANGE must keep inclusive end key boundaries and must not be changed"
+  ],
+  "affected_prior": [
+   "SSTable data block write format (round 3: writeSSTable/SSTableWriter)",
+   "SSTable data block read path (round 3: SSTableReader/readBlock)",
+   "CRC-32 per-block checksum (round 3) \u2014 must cover compressed bytes",
+   "VERIFY command (round 3) \u2014 must validate compressed blocks",
+   "compactL0ToL1 (round 3) \u2014 emits SSTables in new compressed format",
+   "SCAN/SNAP_SCAN/TX_SCAN commands (round 1+) \u2014 boundary semantics flip to exclusive end",
+   "EntriesInRange in memtable (round 1) \u2014 likely needs exclusive-end handling for scan path"
+  ],
+  "summary": "This round adds shared-prefix (key-prefix delta) compression to SSTable data blocks while keeping the block CRC-32 over the compressed bytes, and switches SCAN/SNAP_SCAN/TX_SCAN to an exclusive end key while leaving DELETE_RANGE inclusive."
+ },
+ "instruction_head": "Two changes this round.\n\nFirst, add shared-prefix compression to SSTable data blocks. Within each data block, the first entry stores its full key using the existing format. Every subsequent entry stores a `shared_prefix_len` (uint16 LE) immediately before the `key_len` field, where `shared_prefix_len` is the number of leading bytes the key shares with the *previous* entry's full key. The `key_len` and `key` fields then contain only the non-shared suffix. So each non-first entry in a block is: `s"
+}

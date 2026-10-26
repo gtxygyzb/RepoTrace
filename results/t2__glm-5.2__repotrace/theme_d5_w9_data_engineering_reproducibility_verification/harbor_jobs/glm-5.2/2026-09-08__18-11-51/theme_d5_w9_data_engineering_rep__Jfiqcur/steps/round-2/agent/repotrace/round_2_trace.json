@@ -1,0 +1,82 @@
+{
+ "round": 2,
+ "root": "/app",
+ "graph": {
+  "n_files": 3,
+  "n_edges": 1,
+  "delta": {
+   "files_added": [
+    "csvio.go",
+    "expr.go",
+    "schema.go"
+   ],
+   "files_removed": [],
+   "edges_added": [
+    [
+     "schema.go",
+     "csvio.go"
+    ]
+   ],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "csvio.go",
+    "pagerank": 0.480519,
+    "fan_in": 1,
+    "fan_out": 0
+   },
+   {
+    "file": "expr.go",
+    "pagerank": 0.25974,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "schema.go",
+    "pagerank": 0.25974,
+    "fan_in": 0,
+    "fan_out": 1
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "cmd/profile.go",
+   "main.go",
+   "recipe.go",
+   "csvio.go",
+   "schema.go"
+  ],
+  "target_symbols": [
+   "runProfile",
+   "inferColumnType",
+   "computeColumnStats",
+   "computePercentile",
+   "computeCorrelations",
+   "applyDeduplicate",
+   "applySplit"
+  ],
+  "behavior_constraints": [
+   "profile command reads CSV (first row header), infers types, writes JSON statistical profile to output path with 2-space indentation and trailing newline",
+   "type inference order: int (ParseInt base10 bitsize64) \u2192 float (ParseFloat bitsize64) \u2192 datetime (RFC3339) \u2192 string; zero non-empty values \u2192 string",
+   "int and float columns include: count, null_count, unique, min, max, mean, stddev (population, sqrt(sum((xi-mean)^2)/n), 0 for single value), median, p25, p75",
+   "percentile: idx = p/100*(n-1); integer idx \u2192 values[idx]; else interpolate lower=floor(idx), upper=ceil(idx), frac=idx-lower, result=values[lower]+frac*(values[upper]-values[lower])",
+   "skewness: adjusted Fisher-Pearson with sample stddev (n-1); null if n<3 or s==0",
+   "kurtosis: sample excess kurtosis; null if n<4 or s==0",
+   "mode: most frequent value, smallest wins ties, null if all unique or count==0; int\u2192integer, float\u2192number",
+   "histogram: 10 equal-width bins, bins 0-8 [low,high), bin 9 [low,max]; identical values \u2192 single bin; empty count \u2192 []",
+   "string columns include: min_length, max_length (0 if count 0), most_common (top 5 by count desc, ties value asc), avg_length (0 if count 0)",
+   "datetime columns include: earliest and latest as RFC 3339 strings"
+  ],
+  "affected_prior": [
+   "main.go",
+   "cmd/transform.go",
+   "recipe.go",
+   "schema.go"
+  ],
+  "summary": "Add a profile command that infers column types and computes comprehensive statistics with a correlation matrix, plus deduplicate and split transforms."
+ },
+ "instruction_head": "Add the following capabilities to `dpipe`.\n\n## New command: `profile`\n\n`dpipe profile --input <path> --output <path>`\n\nReads a CSV file (first row is header), infers column types from data, and writes a JSON statistical profile to the output path.\n\n### Type inference\n\nSince `profile` operates without a schema, column types are inferred from non-empty values:\n\n1. If **all** non-empty values parse as integers (Go's `strconv.ParseInt` with base 10, bit size 64): type is `int`.\n2. Else if all non-em"
+}

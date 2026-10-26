@@ -1,0 +1,363 @@
+[
+ {
+  "round": 1,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [
+     "main.go"
+    ],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "main.go",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go"
+   ],
+   "target_symbols": [
+    "main",
+    "evaluate",
+    "compare",
+    "EvaluationReport",
+    "ComparisonResult",
+    "TaskType",
+    "computeMetrics",
+    "generateMarkdownReport",
+    "generateJSONReport",
+    "detectRegressions"
+   ],
+   "behavior_constraints": [
+    "CLI exposes `mlreport` with `evaluate` and `compare` subcommands.",
+    "`evaluate` computes metrics from raw predictions for binary classification, multiclass classification, and regression.",
+    "`evaluate` generates both Markdown and JSON reports.",
+    "`compare` compares two model evaluations and detects regressions.",
+    "Comparison logic enforces compound regression rules from `spec_v1.md`.",
+    "CLI semantics, computation rules, and report formatting follow `spec_v1.md`."
+   ],
+   "affected_prior": [],
+   "summary": "Implement the `mlreport` CLI from `spec_v1.md` with `evaluate` and `compare` subcommands supporting all task types, Markdown/JSON reports, and compound regression comparison rules."
+  },
+  "instruction_head": "Implement the ML evaluation report engine defined in `/app/docs/spec_v1.md`.\n\nThe spec defines a CLI tool called `mlreport` with two subcommands: `evaluate` (compute metrics from raw predictions and generate reports) and `compare` (compare two model evaluations and detect regressions). The tool must handle all three task types (binary classification, multiclass classification, regression), produce both Markdown and JSON reports, and enforce compound regression rules during comparison. All comput"
+ },
+ {
+  "round": 2,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "main.go",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go"
+   ],
+   "target_symbols": [
+    "evaluate",
+    "compare",
+    "EvaluationReport",
+    "ComparisonResult",
+    "smape"
+   ],
+   "behavior_constraints": [
+    "evaluate command must accept --bootstrap, --confidence, and --seed flags",
+    "when bootstrap is enabled, confidence intervals must be computed for metrics and included in JSON output",
+    "when bootstrap is enabled, confidence intervals must be rendered in the Markdown report",
+    "regression metric key must be 'smape' (not 'mape') in all JSON and Markdown outputs",
+    "smape must use the Symmetric Mean Absolute Percentage Error formula",
+    "existing v1 evaluate and compare functionality must continue to work",
+    "compound regression comparison rules must reference the renamed smape metric consistently"
+   ],
+   "affected_prior": [
+    "evaluate",
+    "EvaluationReport",
+    "compare",
+    "ComparisonResult"
+   ],
+   "summary": "Round 2 adds bootstrap confidence interval flags/output to evaluate and renames/rewrites the regression MAPE metric as sMAPE across all reports and comparisons."
+  },
+  "instruction_head": "The specification has been updated to v2 (`/app/docs/spec_v2.md`). The changes from v1 include:\n\n1. **Bootstrap Confidence Intervals**: The `evaluate` command now supports bootstrap confidence interval computation for metrics. New flags `--bootstrap`, `--confidence`, and `--seed` control this feature. Confidence intervals should appear in both JSON and Markdown report outputs.\n\n2. **sMAPE replaces MAPE**: The regression metric previously named `mape` has been corrected to `smape` (Symmetric Mean"
+ },
+ {
+  "round": 3,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "main.go",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go"
+   ],
+   "target_symbols": [
+    "runEvaluate",
+    "runCompare",
+    "buildComparisonData",
+    "buildComparisonMarkdown",
+    "loadRegressionConfig",
+    "metricOrderForTask"
+   ],
+   "behavior_constraints": [
+    "compare regression detection distinguishes higher-is-better metrics (accuracy, precision, recall, f1, auc_roc, r_squared, etc.) from lower-is-better metrics (mse, rmse, mae, log_loss, smape)",
+    "higher-is-better metrics regress when they decrease; lower-is-better metrics regress when they increase",
+    "regression config accepts new fields max_delta and max_relative_delta (non-negative, representing maximum allowed worsening)",
+    "old config field names min_absolute_delta and min_relative_delta are still accepted for backward compatibility",
+    "regression analysis output includes a direction field indicating higher-is-better or lower-is-better",
+    "evaluate accepts a --split flag to filter evaluation to specific splits",
+    "--split supports comma-separated split names",
+    "only specified splits appear in the evaluate output when --split is provided",
+    "all v1/v2 functionality continues to work with the regression direction change applied"
+   ],
+   "affected_prior": [
+    "runCompare",
+    "buildComparisonData",
+    "buildComparisonMarkdown",
+    "loadRegressionConfig",
+    "runEvaluate",
+    "compare",
+    "evaluate"
+   ],
+   "summary": "Round 3 makes compare regression detection direction-aware (with max_delta/max_relative_delta config replacing min_absolute_delta/min_relative_delta plus backward compatibility and a direction output field) and adds a --split filter flag to the evaluate command."
+  },
+  "instruction_head": "The specification has been updated to v3 (`/app/docs/spec_v3.md`). The changes from v2 include:\n\n1. **Metric Direction-Aware Regression Detection (conflict with v2)**: The `compare` command's regression detection now distinguishes between \"higher-is-better\" metrics (accuracy, precision, recall, f1, auc_roc, r_squared, etc.) and \"lower-is-better\" metrics (mse, rmse, mae, log_loss, smape). Previously, all metrics used the same delta direction for regression checks (`delta < min_absolute_delta`). N"
+ },
+ {
+  "round": 4,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "main.go",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go"
+   ],
+   "target_symbols": [
+    "main",
+    "runSummary"
+   ],
+   "behavior_constraints": [
+    "A `summary` subcommand is added to the CLI.",
+    "It reads an existing `report.json` produced by `evaluate`.",
+    "It prints exactly one concise summary line to stdout.",
+    "The summary includes model name, version, task type, and number of splits.",
+    "Binary summaries include averaged accuracy, f1, and auc_roc; multiclass includes averaged accuracy and f1_macro; regression includes averaged rmse, mae, and r_squared.",
+    "Summary metric values are rounded to 4 decimal places.",
+    "Existing evaluate and compare behavior from v1/v2/v3 remains unchanged."
+   ],
+   "affected_prior": [
+    "main"
+   ],
+   "summary": "This round adds a `summary` subcommand that reads an evaluate report.json and prints a single-line summary with model/version/task/splits and task-specific averaged primary metrics rounded to 4 decimals."
+  },
+  "instruction_head": "The specification has been updated to v4 (`/app/docs/spec_v4.md`). The changes from v3 include:\n\n1. **Summary Subcommand (extension)**: A new `summary` subcommand has been added. It reads an existing `report.json` (generated by the `evaluate` command) and outputs a concise single-line summary to stdout. The summary includes the model name, version, task type, number of splits, and primary metrics (averaged across splits). Primary metrics vary by task type: `accuracy`, `f1`, `auc_roc` for binary;"
+ },
+ {
+  "round": 5,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "main.go",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go"
+   ],
+   "target_symbols": [
+    "ciMetricsForTask",
+    "computeBootstrapCIs",
+    "runCompare",
+    "buildComparisonData",
+    "buildComparisonMarkdown"
+   ],
+   "behavior_constraints": [
+    "When bootstrap confidence intervals are enabled for a regression evaluation, CIs are computed for mse, rmse, mae, r_squared, and smape, and the smape CI is included in the evaluate output.",
+    "The compare command accepts an optional --exclude-metric flag whose value is a comma-separated list of metric names.",
+    "Metrics named in --exclude-metric still appear in the performance delta table in both Markdown and JSON output.",
+    "Metrics named in --exclude-metric are not checked for regression and are omitted from the regression analysis table and regression analysis JSON output.",
+    "Metric names in --exclude-metric that do not exist in the evaluation results or regression config are silently ignored without errors.",
+    "All existing v1-v4 behavior remains unchanged except for the regression smape CI inclusion and compare exclusion filtering."
+   ],
+   "affected_prior": [
+    "ciMetricsForTask",
+    "computeBootstrapCIs",
+    "runCompare",
+    "buildComparisonData",
+    "buildComparisonMarkdown"
+   ],
+   "summary": "Round 5 adds smape to regression bootstrap CI computation and adds a --exclude-metric flag to compare that omits specified metrics from regression analysis while keeping them in performance deltas."
+  },
+  "instruction_head": "The specification has been updated to v5 (`/app/docs/spec_v5.md`). The changes from v4 include:\n\n1. **Bootstrap CI correction for regression tasks**: In previous versions, the `smape` metric was excluded from bootstrap confidence interval computation for regression tasks. This has been corrected. The regression CI metrics are now: `mse`, `rmse`, `mae`, `r_squared`, `smape`. When bootstrap is enabled for a regression evaluation, `smape` must now have a confidence interval computed and included in"
+ },
+ {
+  "round": 6,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "main.go",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go"
+   ],
+   "target_symbols": [
+    "runEvaluate",
+    "runCompare",
+    "buildComparisonData",
+    "main"
+   ],
+   "behavior_constraints": [
+    "The --bootstrap flag for the evaluate command must default to 0 instead of 1000",
+    "When --bootstrap is 0 (default), no confidence intervals are computed",
+    "To enable CI computation, user must explicitly pass --bootstrap N where N > 0",
+    "A new --split flag for the compare command accepts a comma-separated list of split names",
+    "When --split is specified, only the listed splits are compared",
+    "When --split is specified, only the specified splits need to exist in both baseline and candidate manifests (other splits can differ without error)",
+    "When --split is not specified, existing behavior is preserved: all splits must match exactly between baseline and candidate",
+    "If a split specified via --split does not exist in either baseline or candidate manifest, the tool must exit with code 2",
+    "All existing functionality from v1-v5 must continue to work unchanged except the bootstrap default"
+   ],
+   "affected_prior": [
+    "runEvaluate (round 2 bootstrap default)",
+    "runCompare (round 3 compare split matching)",
+    "buildComparisonData (round 5 comparison data)"
+   ],
+   "summary": "Round 6 changes the evaluate --bootstrap default from 1000 to 0 (disabling CIs by default) and adds a --split flag to compare that restricts comparison to specified splits with relaxed validation."
+  },
+  "instruction_head": "The specification has been updated to v6 (`/app/docs/spec_v6.md`). The changes from v5 include:\n\n1. **Bootstrap default change (conflict with v2-v5)**: The `--bootstrap` flag for the `evaluate` command now defaults to `0` instead of `1000`. This means confidence intervals are no longer computed by default. To enable CI computation, you must explicitly pass `--bootstrap N` where `N > 0`. This is a breaking change from v2-v5 where CIs were computed by default with 1000 iterations.\n\n2. **`--split` "
+ },
+ {
+  "round": 7,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "main.go",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go"
+   ],
+   "target_symbols": [
+    "buildComparisonMarkdown",
+    "runSummary",
+    "main",
+    "metricOrderForTask"
+   ],
+   "behavior_constraints": [
+    "The compare command's regression analysis Markdown table must list metrics in the standard task-type order (regression: mse, rmse, mae, r_squared, smape; binary: accuracy, precision, recall, f1, auc_roc, log_loss) rather than alphabetical order, including only metrics present in the analysis.",
+    "JSON output of compare is unaffected (object keys remain unordered).",
+    "The summary command accepts a new --json flag.",
+    "When --json is passed to summary, output a JSON object to stdout with fields: model (object with name, version, task_type), split_count (integer), and primary_metrics (object mapping metric names to float values rounded to 4 decimal places).",
+    "When --json is not passed to summary, the existing text summary line behavior is unchanged."
+   ],
+   "affected_prior": [
+    "buildComparisonMarkdown (round 1/3)",
+    "runSummary (round 4)",
+    "main summary subcommand registration (round 4)"
+   ],
+   "summary": "Round 7 fixes compare's regression analysis Markdown metric ordering to use standard task-type order via metricOrderForTask and adds a --json flag to the summary command that emits a structured JSON object with model metadata, split_count, and rounded primary_metrics."
+  },
+  "instruction_head": "The specification has been updated to v7 (`/app/docs/spec_v7.md`). The changes from v6 include:\n\n1. **Regression analysis metric ordering (correction)**: The compare command's regression analysis table in Markdown output previously listed metrics in alphabetical order (using `sort.Strings`). This was an oversight from v3. The table must now list metrics in the standard metric order for the task type, matching the order used in the evaluate output. For regression: `mse`, `rmse`, `mae`, `r_squared"
+ }
+]

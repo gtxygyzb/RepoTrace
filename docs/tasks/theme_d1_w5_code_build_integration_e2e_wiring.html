@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>buildctl-pipeline-orchestrator — EvoCode-Bench</title>
+<link rel="stylesheet" href="../assets/site.css">
+</head><body>
+<div class="wrap">
+  <header class="top">
+    <h1>buildctl-pipeline-orchestrator</h1>
+    <span class="crumb"><a href="../index.html">← all tasks</a></span>
+  </header>
+  <p class="sub">
+    <span class="pill hard">hard</span>
+    <span class="pill">build system integration</span>
+    <span class="pill">8 rounds</span>
+    <span class="pill">theme_d1_w5_code_build_integration_e2e_wiring</span><br>
+    Build a CLI tool called `buildctl` in Go that orchestrates multi-target build pipelines with dependency resolution, parallel execution, and content-addressable artifact caching.
+  </p>
+
+  <div class='analysis'><p style='margin:0'><strong>GPT-5.5 alone clears 6 of 8 rounds across 12 models; every other model stalls at 2 or fewer, and three pass 0 rounds despite the ceiling on case coverage reaching 99%.</strong></p></div>
+
+  <h2>What the agent is asked, round by round</h2>
+  <p class="sub" style="margin-top:0">Each round adds new requirements to the same workspace. Click a round to read the exact task the agent was given.</p>
+  <div id="rounds"></div>
+
+  <h2>Per-round test-case results</h2>
+  <div class="keybox">
+    <b>How to read the grid.</b> Every round ships an executable test suite. A cell like <b>43</b>/45&nbsp;<span class="xf">2✗</span>
+    means the model passed <b>43 of the round's 45 test cases</b> and <b>2 failed</b>. The round earns a reward of
+    <b>1 only if every case passes</b> — so a model can pass 43/45 and still score 0 for that round. The case counts
+    show the partial progress the 0/1 round score hides. Cell <b>color = how many cases failed</b> (green = 0).
+    A <b>build&nbsp;✗</b> cell means the model's code did not compile, so the tests could not run (a real 0 — the
+    reference solution builds fine). <b>n/a</b> means that run never reached this round. <b>Click any cell</b> for details below.
+  </div>
+  <div id="heatmap"></div>
+  <div class="legend">cases failed in the cell:
+    <i style="background:#2fae5f"></i>0<i style="background:#8ec74e"></i>1-2<i style="background:#d6c34a"></i>3-5
+    <i style="background:#e89a3c"></i>6-10<i style="background:#e3692f"></i>11-20<i style="background:#d23b34"></i>20+
+    <i style="background:#3a2730"></i>code didn't build<i style="background:#22272f"></i>round not run (n/a)</div>
+  <div id="detail"><span class="ph">Click a cell above to see the round's task and that model's failed requirements.</span></div>
+
+  <h2>Difficulty analysis</h2>
+  <div class='analysis'><p>This task wires up <code>buildctl</code>, a Go CLI that orchestrates multi-target build pipelines: dependency resolution, parallel execution, caching, hooks, variable substitution and config imports. 8 rounds across 12 models. As an <strong>integration / e2e-wiring</strong> task, the difficulty is making independently-correct pieces work together — affected-set computation feeding the planner, hooks chaining in order, variables resolving with the right precedence across imported files.</p><p>The hardest commonly-failed area is <strong>profiling and matrix expansion</strong>: <span class='req'>profile-critical-path</span> is missed by 10 of 12 models (<em>"expected='a,b,c', got=''"</em>), while <span class='req'>matrix-include</span>, <span class='req'>matrix-exclude</span>, <span class='req'>matrix-expansion</span>, <span class='req'>retry.matrix</span> and <span class='req'>retry.imports</span> are each missed by 9 of 12 models — every late-round feature lands as a cluster failure, meaning the wiring between matrix state and retry/import logic is almost universally broken.</p></div>
+
+  <h2>Per-model failures (whole task)</h2>
+  <p class="sub" style="margin-top:0">Click a model to expand every requirement it failed across all rounds, with a representative reason from the verifier.</p>
+  <div id="breakdown"></div>
+
+  <h2>Performance gap</h2>
+  <div class='analysis'><p><strong>GPT-5.5 stands alone at 6/8 rounds and 96% case coverage</strong> — the only model to push through matrix expansion and retry rounds. The next tier, Opus-4.8-xhigh and GLM-5.2, each pass 2/8 rounds (96% and 82% cases respectively), showing solid core construction but stalling at the same matrix/profile wall the field hits. <span class='req'>profile-critical-path</span>, <span class='req'>matrix-include</span>, <span class='req'>matrix-exclude</span>, <span class='req'>matrix-expansion</span>, <span class='req'>retry.matrix</span> and <span class='req'>retry.imports</span> are the load-bearing failures keeping every model below GPT-5.5.</p><p>High case coverage masks shallow completeness throughout: Kimi-K2.6 (99% cases, 1/8 rounds), Qwen3.6-Plus (97% cases, 1/8 rounds) and Opus-4.8-xhigh (96% cases, 2/8 rounds) all build a nearly-correct core but cannot integrate the late features into a passing round. At the bottom, MiniMax-M2.7 scores just 10% on cases and 0/8 rounds — a structural failure, not a feature gap.</p></div>
+
+  <h2>Is the task fair? (top-model check)</h2>
+  <div class='analysis'><p>Opus-4.8 first fails at round 3 ('Add pre/post build hooks and fix cache keys'), passing 180/185 cases. The two breaking requirements are <span class='req'>cache-key-fix</span> (4 cases: produced <code>a= b=</code> instead of the required distinct keys <code>key_a != key_b</code>) and <span class='req'>hook-failure</span> (1 case: produced an empty status string instead of <code>built</code>). The oracle passes this round cleanly, ruling out a test defect — the cache-key derivation logic and hook-completion signalling are genuine implementation gaps, not grading artifacts.</p></div>
+
+  <p class="foot">Test-case data extracted from the verifier <code>CASE_RESULT</code> logs of each model's run.
+    Reasons are the verifier's own <code>failure_reason</code> (back-filled from expected/actual when terse).</p>
+</div>
+
+<script src="../assets/site.js"></script>
+<script>
+fetch("../data/tasks/theme_d1_w5_code_build_integration_e2e_wiring.json").then(function(r){return r.json();}).then(function(T){
+  window.__MODELS__ = Object.keys(T.models);
+  var detail = document.getElementById("detail");
+  EvoViz.renderRounds(document.getElementById("rounds"), T);
+  EvoViz.renderHeatmap(document.getElementById("heatmap"), T, function(model, round){
+    EvoViz.renderDetail(detail, T, model, round);
+    detail.scrollIntoView({behavior:"smooth", block:"nearest"});
+  });
+  EvoViz.renderBreakdown(document.getElementById("breakdown"), T);
+});
+</script>
+</body></html>

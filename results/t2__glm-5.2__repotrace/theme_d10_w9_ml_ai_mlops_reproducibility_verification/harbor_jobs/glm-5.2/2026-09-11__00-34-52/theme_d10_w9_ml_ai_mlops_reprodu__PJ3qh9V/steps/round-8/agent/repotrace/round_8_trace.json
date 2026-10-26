@@ -1,0 +1,102 @@
+{
+ "round": 8,
+ "root": "/app",
+ "graph": {
+  "n_files": 10,
+  "n_edges": 24,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "internal/mlck/checkpoint.go",
+    "pagerank": 0.272082,
+    "fan_in": 7,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/compare/compare.go",
+    "pagerank": 0.130696,
+    "fan_in": 4,
+    "fan_out": 3
+   },
+   {
+    "file": "internal/drift/drift.go",
+    "pagerank": 0.122313,
+    "fan_in": 3,
+    "fan_out": 3
+   },
+   {
+    "file": "internal/merge/merge.go",
+    "pagerank": 0.122313,
+    "fan_in": 3,
+    "fan_out": 3
+   },
+   {
+    "file": "internal/app/app.go",
+    "pagerank": 0.102943,
+    "fan_in": 2,
+    "fan_out": 7
+   },
+   {
+    "file": "internal/lineage/lineage.go",
+    "pagerank": 0.061385,
+    "fan_in": 2,
+    "fan_out": 1
+   },
+   {
+    "file": "internal/manifest/manifest.go",
+    "pagerank": 0.061385,
+    "fan_in": 2,
+    "fan_out": 1
+   },
+   {
+    "file": "internal/report/report.go",
+    "pagerank": 0.050627,
+    "fan_in": 1,
+    "fan_out": 4
+   },
+   {
+    "file": "cmd/repro-verify/main.go",
+    "pagerank": 0.038127,
+    "fan_in": 0,
+    "fan_out": 1
+   },
+   {
+    "file": "main.go",
+    "pagerank": 0.038127,
+    "fan_in": 0,
+    "fan_out": 1
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "internal/drift/drift.go"
+  ],
+  "target_symbols": [
+   "Analyze",
+   "AnalyzeWithTopK",
+   "classifyConvergence",
+   "meanFloat64"
+  ],
+  "behavior_constraints": [
+   "stability_score = 1 - (last_step_change / mean_change) where mean_change is the mean of consecutive step changes",
+   "if mean_change is zero, stability_score is set to 1.0",
+   "stability_score is clamped to [0, 1]",
+   "when all consecutive step changes are exactly equal and non-zero, classifyConvergence returns \"stable\"",
+   "when all consecutive step changes are zero, classifyConvergence returns \"converging\"",
+   "tensors classified as \"stable\" do not increment converging_count or diverging_count in overall_convergence"
+  ],
+  "affected_prior": [
+   "round 5 (stability-score normalization and classifyConvergence)",
+   "round 6 (per-tensor drifting status derived from stability score, and overall_convergence counts)"
+  ],
+  "summary": "This round replaces the max-step-change denominator with the mean step change in the stability score and introduces a \"stable\" convergence classification for tensors whose non-zero step changes are all equal, excluding them from converging/diverging counts."
+ },
+ "instruction_head": "The stability score formula from the earlier drift-analysis fix overcorrects: using the maximum step change as the denominator means a single anomalous spike anchors the score for all tensors. Use the mean step change as the denominator instead: `stability_score = 1 - (last_step_change / mean_change)`. If mean_change is zero, set stability to 1.0. Keep the same clamping to [0, 1].\n\nAlso, the convergence classification should distinguish between truly converging tensors and perfectly stable ones."
+}

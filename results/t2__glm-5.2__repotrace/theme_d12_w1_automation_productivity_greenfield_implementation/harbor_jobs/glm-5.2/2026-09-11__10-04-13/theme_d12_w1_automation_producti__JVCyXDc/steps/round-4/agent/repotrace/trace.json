@@ -1,0 +1,335 @@
+[
+ {
+  "round": 1,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [
+     "cmd/flowr/main.go"
+    ],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/flowr/main.go",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/flowr/main.go",
+    "go.mod"
+   ],
+   "target_symbols": [
+    "main",
+    "parseWorkflow"
+   ],
+   "behavior_constraints": [
+    "flowr executable must be compiled and available on PATH, invocable from any working directory",
+    "flowr run <workflow.yaml> subcommand accepts --max-parallel (default 4), --run-id, --only-step, --skip-step flags",
+    "When --run-id is omitted, generate run-YYYYmmddTHHMMSSZ-<6 lowercase hex> from a random source",
+    "Workflow YAML parsing enforces: version, optional env, steps list with name/cmd/needs/env/retries/timeout_ms/on_failure/matrix keys only",
+    "Unknown top-level keys and unknown step keys are validation errors",
+    "Step names must match ^[A-Za-z0-9_][A-Za-z0-9_.-]*$; [ and ] are reserved",
+    "env keys (workflow and step) must match ^[A-Za-z_][A-Za-z0-9_]*$",
+    "cmd must be non-empty and contain no NUL byte",
+    "retries and timeout_ms must be non-negative integers",
+    "on_failure must be exactly halt or continue (default halt)"
+   ],
+   "affected_prior": [],
+   "summary": "Round 1 demands a complete from-scratch implementation of the flowr workflow orchestrator CLI with YAML workflow parsing, matrix expansion, DAG scheduling under bounded parallelism, retries, timeouts, cancellation, selective filters, and structured reporting."
+  },
+  "instruction_head": "# flowr \u2014 workflow orchestrator\n\nBuild a command-line workflow orchestrator called `flowr`. It reads a YAML workflow file that describes a DAG of shell commands and runs those commands in dependency order with bounded parallelism, matrix-based step fan-out, variable interpolation, retries, timeouts, graceful cancellation, selective execution filters, and a structured run report plus an append-only event log.\n\nThe Go toolchain and a Go module named `flowr` requiring `gopkg.in/yaml.v3 v3.0.1` are "
+ },
+ {
+  "round": 2,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/flowr/main.go",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/flowr/main.go",
+    "go.mod"
+   ],
+   "target_symbols": [
+    "main",
+    "parseWorkflow",
+    "computeCacheKey",
+    "lookupCache",
+    "writeCacheEntry",
+    "cachePrune",
+    "runWorkflow",
+    "expandInputs",
+    "sha256File",
+    "executeStep",
+    "buildReport"
+   ],
+   "behavior_constraints": [
+    "Steps may declare optional `inputs` (file globs: *, **, or exact paths) and `outputs` (exact file paths) lists",
+    "Inputs match only regular files; directories and non-regular-file symlinks are ignored",
+    "Literal input pattern with no matching file => cache-key failure: exit_code null, status 'failed', step never launches shell, counts as failed for halt/continue and global run status",
+    "Steps with neither inputs nor outputs are not cacheable and always execute as before",
+    "Cache key = SHA-256 of deterministic JSON serialization of {cmd, env, matrix, inputs, outputs} with keys in that exact order, no extra whitespace, UTF-8",
+    "cmd field uses final interpolated command, or JSON array of pipe stages for pipelined steps",
+    "env field is sorted-by-key list of [key,value] pairs composed of workflow env + step env + FLOWR_STEP and FLOWR_MATRIX_* builtins; parent-process env and run-dependent FLOWR_* (notably FLOWR_RUN_ID) are excluded from hash but still exported",
+    "inputs field is sorted-by-path-ascending list of [path, sha256(content)] pairs",
+    "outputs field is sorted-ascending list of declared output paths",
+    "Cache entries stored at .flowr/cache/<key>.json with {key, created_at (RFC-3339 millisecond UTC), outputs:[{path, sha256}]}"
+   ],
+   "affected_prior": [
+    "main",
+    "parseWorkflow",
+    "runWorkflow/executeStep",
+    "DAG scheduler",
+    "report.json generation",
+    "events log",
+    "step directory/meta.json writer",
+    "go.mod"
+   ],
+   "summary": "Round 2 layers a content-addressed build cache (inputs/outputs globs, SHA-256 cache key, .flowr/cache entries, cache hits/misses, --no-cache flag, flowr cache prune), resource reservations with peak tracking, and a pipelined command form onto the existing flowr orchestrator without regressing prior behavior."
+  },
+  "instruction_head": "# flowr \u2014 incremental execution, resource reservations, and pipelines\n\nExtend the existing `flowr` orchestrator with three feature families: a content-addressed build cache that lets repeat runs skip work, resource reservations so the scheduler can respect CPU and memory budgets, and a pipelined command form for steps that want to chain programs with shell pipes. All previously specified behavior continues to hold; the additions are layered on top and must not regress any existing guarantee.\n\n##"
+ },
+ {
+  "round": 3,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/flowr/main.go",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/flowr/main.go",
+    "go.mod"
+   ],
+   "target_symbols": [
+    "main",
+    "parseWorkflow",
+    "RetryPolicy",
+    "parseRetryPolicy",
+    "computeRetryDelay",
+    "evaluateWhenExpression",
+    "parseWhenExpression",
+    "runHooks",
+    "expandForeach",
+    "structuredOutputs",
+    "resumeRun"
+   ],
+   "behavior_constraints": [
+    "retry and retries are mutually exclusive on a step (exit 4)",
+    "retry must be a mapping; unknown keys inside are a validation error (exit 4)",
+    "retry.count is required when retry: is declared (exit 4)",
+    "retry.count, retry.initial_ms, retry.max_ms must be integers >= 0 (exit 4)",
+    "retry.backoff must be one of fixed|linear|exponential (exit 4)",
+    "retry.jitter must be a boolean (exit 4)",
+    "fixed delay = initial_ms; linear delay = initial_ms*n; exponential delay = initial_ms*2^(n-1)",
+    "delay clamped to [0, max_ms] when max_ms>0; no upper bound when max_ms==0",
+    "jitter subtracts a pseudo-random integer in [0, delay/4] from delay, never below 0, never exceeding max_ms clamp",
+    "scalar retries: form still uses fixed backoff with initial_ms=100 matching R1 exactly"
+   ],
+   "affected_prior": [
+    "R1 retries: scalar form must coexist with structured retry: and remain fixed/initial_ms=100",
+    "R1/R2 report.json schema: new retry_attempts field on every step entry, conditionally_skipped status with its neutral field set",
+    "R1/R2 events.ndjson: new step_conditionally_skipped event; retry_delay_ms field on retry step_started events",
+    "R1/R2 DAG scheduler: must evaluate when before launch, treat conditionally-skipped dependents as eligible, exclude skipped steps from order_attempted",
+    "R2 content-addressed cache: conditionally-skipped steps bypass cache entirely (no lookup, no write, no cache_key file)",
+    "R2 resource reservations: conditionally-skipped steps must not reserve resources"
+   ],
+   "summary": "Round 3 adds structured retry policies with backoff/jitter, conditional `when:` steps with a conditionally_skipped status, workflow-level hooks, plus (named but underspecified in the visible text) foreach expansion, structured outputs, and resume; new report/event fields are added while all R1/R2 behavior must remain non-regressive."
+  },
+  "instruction_head": "# flowr \u2014 retry policies, conditional steps, workflow hooks, foreach expansion, structured outputs, and resume\n\nExtend the `flowr` orchestrator with six new feature families and a targeted clarification of an existing rule. All behavior specified in rounds 1 and 2 continues to hold without regression:\n\n* validation and exit codes,\n* matrix expansion rules,\n* `${VAR}` interpolation,\n* scheduling with `--max-parallel`, lexicographic tie-breaking, and resource reservations,\n* graceful cancellation "
+ },
+ {
+  "round": 4,
+  "root": "/app",
+  "graph": {
+   "n_files": 7,
+   "n_edges": 7,
+   "delta": {
+    "files_added": [
+     "cmd/flowr/expand.go",
+     "cmd/flowr/interpolate.go",
+     "cmd/flowr/parse.go",
+     "cmd/flowr/types.go",
+     "cmd/flowr/util.go",
+     "cmd/flowr/validate.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "cmd/flowr/expand.go",
+      "cmd/flowr/interpolate.go"
+     ],
+     [
+      "cmd/flowr/expand.go",
+      "cmd/flowr/parse.go"
+     ],
+     [
+      "cmd/flowr/expand.go",
+      "cmd/flowr/util.go"
+     ],
+     [
+      "cmd/flowr/expand.go",
+      "cmd/flowr/validate.go"
+     ],
+     [
+      "cmd/flowr/interpolate.go",
+      "cmd/flowr/util.go"
+     ],
+     [
+      "cmd/flowr/interpolate.go",
+      "cmd/flowr/validate.go"
+     ],
+     [
+      "cmd/flowr/validate.go",
+      "cmd/flowr/parse.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/flowr/parse.go",
+     "pagerank": 0.259066,
+     "fan_in": 2,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/flowr/util.go",
+     "pagerank": 0.16695,
+     "fan_in": 2,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/flowr/validate.go",
+     "pagerank": 0.16695,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/flowr/interpolate.go",
+     "pagerank": 0.117158,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/flowr/expand.go",
+     "pagerank": 0.096625,
+     "fan_in": 0,
+     "fan_out": 4
+    },
+    {
+     "file": "cmd/flowr/main.go",
+     "pagerank": 0.096625,
+     "fan_in": 0,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/flowr/types.go",
+     "pagerank": 0.096625,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/flowr/types.go",
+    "cmd/flowr/parse.go",
+    "cmd/flowr/validate.go",
+    "cmd/flowr/interpolate.go",
+    "cmd/flowr/main.go",
+    "cmd/flowr/util.go",
+    "cmd/flowr/expand.go"
+   ],
+   "target_symbols": [
+    "parseSecrets",
+    "parseArtifacts",
+    "validateSecrets",
+    "validateArtifact",
+    "validateArtifacts",
+    "buildRedactionTable",
+    "redactBytes",
+    "redactString",
+    "redactWriter",
+    "collectArtifacts",
+    "writePlan",
+    "interpolateFirstPass",
+    "resolveStepOutputs",
+    "outputValueToString",
+    "computeCacheKey",
+    "parseWorkflow",
+    "validateWorkflow",
+    "validateStep",
+    "expandMatrix",
+    "expandForeach"
+   ],
+   "behavior_constraints": [
+    "Top-level `secrets:` block permits only `keys`; unknown keys cause exit 4.",
+    "`keys` entries must match ^[A-Za-z_][A-Za-z0-9_]*$, be unique and non-empty; violations cause exit 4.",
+    "Each declared secret NAME is read from the parent process env at flowr run start; unset is treated as empty string; empty-string secret values are legal but never redacted.",
+    "${secret.NAME} is a separate namespace resolved in the first interpolation pass; bare ${NAME} never resolves to a secret value.",
+    "Referencing ${secret.NAME} for an undeclared secret is a validation error (exit 4) with message `undefined secret: <NAME>`.",
+    "A redaction table mapping each non-empty raw secret value to `***` is built before any byte is written to any sink (events.ndjson, report.json, meta.json, stdout, stderr, output.json, hook stdout/stderr, plan.json, orchestrator stdout/stderr).",
+    "Redaction replaces longer secret values before shorter ones, greedy and non-overlapping, byte-for-byte.",
+    "Cache-key computation uses the redacted form of secret values in env, cmd strings, and resolved step output substitutions.",
+    "Redaction applies to inherited/resumed steps (F17): events.ndjson contains a redacted snapshot, not a raw copy.",
+    "report.json gains top-level `secrets.declared` (sorted list of declared key names) and `secrets.redactions_applied` (total raw-value replacement count across all sinks; 0 when no secrets or all empty)."
+   ],
+   "affected_prior": [
+    "parseWorkflow (parse.go) \u2014 must parse top-level secrets block and per-step artifacts",
+    "validateWorkflow / validateStep (validate.go) \u2014 must validate secrets and artifacts, and reject undeclared ${secret.NAME} references",
+    "interpolateFirstPass (interpolate.go) \u2014 must resolve ${secret.NAME} as a separate namespace in the first pass, without fall-through",
+    "resolveStepOutputs / outputValueToString (interpolate.go) \u2014 output.json read-back must apply textual redaction before downstream ${step.NAME.output.KEY} resolution",
+    "computeCacheKey (main.go, R2) \u2014 must hash the redacted form of secret values",
+    "expandMatrix / expandForeach (expand.go) \u2014 must carry artifacts onto expanded cells",
+    "resume/inherited-step logic (F17, R3) \u2014 must produce redacted events.ndjson from prior run dir",
+    "main (main.go) \u2014 must build redaction table, wrap all sink writers, collect artifacts, emit secrets + per-step artifacts report fields, and write plan.json",
+    "report generation (R1/R2/R3) \u2014 gains secrets field and per-step artifacts list with neutral values for non-executed steps"
+   ],
+   "summary": "Round 4 hardens flowr for production observability by adding a top-level secrets block with ${secret.NAME} interpolation and global textual redaction across all run artifacts, per-step artifact collection with status-downgrade precedence, and dry-run plan.json generation."
+  },
+  "instruction_head": "# flowr \u2014 secrets, artifacts, and dry-run planning\n\nExtend the `flowr` orchestrator with three new feature families that harden it for production-grade workflow observability. All behavior from rounds 1, 2, and 3 continues to hold without regression:\n\n* validation rules and exit codes,\n* matrix expansion and `${VAR}` interpolation,\n* scheduling with `--max-parallel`, lexicographic tie-breaking, and resource reservations,\n* graceful cancellation (SIGTERM, 500 ms grace, SIGKILL),\n* content-address"
+ }
+]

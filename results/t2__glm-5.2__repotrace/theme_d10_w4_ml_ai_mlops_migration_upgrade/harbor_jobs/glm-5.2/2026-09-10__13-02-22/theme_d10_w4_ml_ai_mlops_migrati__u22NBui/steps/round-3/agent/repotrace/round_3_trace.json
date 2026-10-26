@@ -1,0 +1,165 @@
+{
+ "round": 3,
+ "root": "/app",
+ "graph": {
+  "n_files": 10,
+  "n_edges": 32,
+  "delta": {
+   "files_added": [
+    "internal/api/batch.go",
+    "internal/api/templates.go"
+   ],
+   "files_removed": [],
+   "edges_added": [
+    [
+     "internal/api/batch.go",
+     "internal/api/handlers.go"
+    ],
+    [
+     "internal/api/batch.go",
+     "internal/serving/serving.go"
+    ],
+    [
+     "internal/api/handlers.go",
+     "internal/api/templates.go"
+    ],
+    [
+     "internal/api/router.go",
+     "internal/api/templates.go"
+    ],
+    [
+     "internal/api/templates.go",
+     "internal/api/handlers.go"
+    ],
+    [
+     "internal/api/templates.go",
+     "internal/pipeline/engine.go"
+    ],
+    [
+     "internal/api/templates.go",
+     "internal/pipeline/steps.go"
+    ],
+    [
+     "internal/pipeline/engine.go",
+     "internal/pipeline/steps.go"
+    ],
+    [
+     "main.go",
+     "internal/api/batch.go"
+    ],
+    [
+     "main.go",
+     "internal/api/templates.go"
+    ]
+   ],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "internal/pipeline/steps.go",
+    "pagerank": 0.21913,
+    "fan_in": 6,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/experiment/experiment.go",
+    "pagerank": 0.202732,
+    "fan_in": 4,
+    "fan_out": 2
+   },
+   {
+    "file": "internal/registry/registry.go",
+    "pagerank": 0.172618,
+    "fan_in": 5,
+    "fan_out": 1
+   },
+   {
+    "file": "internal/api/handlers.go",
+    "pagerank": 0.098761,
+    "fan_in": 4,
+    "fan_out": 6
+   },
+   {
+    "file": "internal/pipeline/engine.go",
+    "pagerank": 0.071875,
+    "fan_in": 4,
+    "fan_out": 1
+   },
+   {
+    "file": "internal/serving/serving.go",
+    "pagerank": 0.071647,
+    "fan_in": 4,
+    "fan_out": 2
+   },
+   {
+    "file": "internal/api/templates.go",
+    "pagerank": 0.056007,
+    "fan_in": 3,
+    "fan_out": 3
+   },
+   {
+    "file": "internal/api/batch.go",
+    "pagerank": 0.036802,
+    "fan_in": 1,
+    "fan_out": 2
+   },
+   {
+    "file": "internal/api/router.go",
+    "pagerank": 0.036802,
+    "fan_in": 1,
+    "fan_out": 6
+   },
+   {
+    "file": "main.go",
+    "pagerank": 0.033626,
+    "fan_in": 0,
+    "fan_out": 9
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "internal/pipeline/steps.go",
+   "internal/pipeline/engine.go",
+   "internal/registry/registry.go",
+   "internal/experiment/experiment.go",
+   "internal/api/handlers.go",
+   "internal/api/router.go",
+   "internal/api/templates.go"
+  ],
+  "target_symbols": [
+   "ExecuteTransform",
+   "Execute",
+   "PromoteVersion",
+   "AggregateMetric",
+   "ExecuteTemplate",
+   "GetModel",
+   "NewRouter",
+   "GetMetricHistory",
+   "UpdateRunMetrics",
+   "SearchRuns"
+  ],
+  "behavior_constraints": [
+   "Normalize transform maps to [-1,1] using formula 2*(x-min)/(max-min)-1 and returns 0.0 for zero-range",
+   "Promoting a new version to production demotes the old production version to staging instead of archived",
+   "weighted_mean aggregation reads weights from run.Metrics instead of run.Parameters, skipping runs lacking the weight metric",
+   "Template execution response includes template_info with template_name, resolved_params, and defaults_used (alphabetically sorted)",
+   "GET /api/v1/models/{name} response includes stage_summary with integer counts for all four stages (development, staging, production, archived)",
+   "Pipeline steps with skip_condition in config are skipped when the referenced variable exists and the condition evaluates true; skipped steps output {\"status\":\"skipped\",\"data\":[]} and do not apply set_vars or output_transform",
+   "Skip condition supports operators gt, lt, eq, gte, lte, ne; missing variable means condition is ignored and step executes normally",
+   "GET /api/v1/experiments/{name}/metrics/{metric}/history returns chronological history of a metric across runs with run_id and value, count field; 404 if experiment missing, 400 with 'no values found' if no runs have the metric",
+   "PUT /api/v1/experiments/{name}/runs/{id} updates run metrics (new keys added, existing overwritten); returns updated run; 404 if experiment or run missing",
+   "POST /api/v1/experiments/{name}/runs/search filters runs by metric conditions (gt, lt, gte, lte, eq) with AND logic; runs missing a filtered metric are excluded; empty filters returns all runs; 404 if experiment missing; response includes runs array and count"
+  ],
+  "affected_prior": [
+   "ExecuteTransform normalize logic in internal/pipeline/steps.go (range change from [0,1] to [-1,1])",
+   "PromoteVersion in internal/registry/registry.go (demotion target change from archived to staging)",
+   "AggregateMetric weighted_mean in internal/experiment/experiment.go (weight source change from Parameters to Metrics)",
+   "ExecuteTemplate in internal/api/templates.go (response shape change with added template_info)",
+   "GetModel handler in internal/api/handlers.go (added stage_summary field)"
+  ],
+  "summary": "This round changes normalize to [-1,1], production demotion to staging, weighted_mean weights to metrics, adds template_info and stage_summary fields, and introduces pipeline step skip conditions plus experiment metric history, run metric update, and run search endpoints."
+ },
+ "instruction_head": "Phase 2 continues with behavioral changes that conflict with prior assumptions, plus new features building on existing infrastructure.\n\n---\n\n## Behavioral Changes (Conflicts)\n\n### Normalize Transform \u2014 Symmetric Range [-1, 1]\n\nThe normalize transform now maps values to the **[-1, 1]** range instead of [0, 1]:\n\n- New formula: `2 * (x - min) / (max - min) - 1`\n- When all values are identical (zero range), return **0.0** (the midpoint of [-1, 1]).\n- This replaces the previous [0, 1] normalization a"
+}

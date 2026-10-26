@@ -1,0 +1,121 @@
+{
+ "round": 13,
+ "root": "/app",
+ "graph": {
+  "n_files": 8,
+  "n_edges": 13,
+  "delta": {
+   "files_added": [
+    "run_provenance.go"
+   ],
+   "files_removed": [],
+   "edges_added": [
+    [
+     "cli.go",
+     "run_provenance.go"
+    ],
+    [
+     "run_provenance.go",
+     "helpers.go"
+    ],
+    [
+     "run_provenance.go",
+     "schema.go"
+    ]
+   ],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "helpers.go",
+    "pagerank": 0.395672,
+    "fan_in": 6,
+    "fan_out": 0
+   },
+   {
+    "file": "main.go",
+    "pagerank": 0.124681,
+    "fan_in": 2,
+    "fan_out": 1
+   },
+   {
+    "file": "schema.go",
+    "pagerank": 0.110655,
+    "fan_in": 2,
+    "fan_out": 2
+   },
+   {
+    "file": "manifest.go",
+    "pagerank": 0.077653,
+    "fan_in": 1,
+    "fan_out": 1
+   },
+   {
+    "file": "run_provenance.go",
+    "pagerank": 0.077653,
+    "fan_in": 1,
+    "fan_out": 2
+   },
+   {
+    "file": "sharding_report.go",
+    "pagerank": 0.077653,
+    "fan_in": 1,
+    "fan_out": 1
+   },
+   {
+    "file": "cli.go",
+    "pagerank": 0.068017,
+    "fan_in": 0,
+    "fan_out": 6
+   },
+   {
+    "file": "types.go",
+    "pagerank": 0.068017,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "cli.go",
+   "main.go",
+   "types.go",
+   "run_provenance.go",
+   "sharding_report.go",
+   "helpers.go"
+  ],
+  "target_symbols": [
+   "parseArgs",
+   "nextArg",
+   "run",
+   "buildRunProvenanceFlags",
+   "runProvenanceFlagValue",
+   "buildShardingReportShards",
+   "isExactRFC3339UTC",
+   "formatCutoffObject",
+   "buildManifest",
+   "atomicWriteFile"
+  ],
+  "behavior_constraints": [
+   "Flag absent or accepted: summary.time_range in --output is byte-identical to existing accepted-only behavior (min/max over accepted events; null/null when zero accepted).",
+   "Empty value (--summary-time-range-policy= or \"\") => exit 2, no output files created, exact stderr: 'ingest: --summary-time-range-policy: value must be non-empty'.",
+   "Value not in {accepted, observed, strict-observed} => exit 2, no output files created, exact stderr: 'ingest: --summary-time-range-policy: value must be one of accepted|observed|strict-observed'.",
+   "Empty-value check runs at parse time; enumeration check runs immediately after; both before any .tmp or output file is written.",
+   "observed: time_range.min/max recomputed over every input line that parses as a JSON object AND has a ts matching exact RFC3339 UTC form YYYY-MM-DDTHH:MM:SSZ, regardless of audit bucket; null/null when no contributing lines.",
+   "observed corpus equals union of sharding-report shards[i].first_ts/last_ts contributions; invariants hold when --sharding-report also emitted.",
+   "strict-observed: runs full accepted pipeline (byte-identical to accepted), then computes observed; if accepted and observed ranges coincide (string-equal including null/null) exit 0.",
+   "strict-observed divergence => exit 2, all emitted output/sidecar/.tmp files removed (--output, --rejects, --state-out, --audit-log, --audit-log-digest, --out-parquet-manifest, --manifest-signature, --summary-schema-*, --sharding-report-*, --run-provenance-*), exact stderr: 'ingest: --summary-time-range-policy: strict-observed divergence: accepted=[<a_min>,<a_max>] observed=[<o_min>,<o_max>]' with literal 'null' for null endpoints.",
+   "Flag composes freely with all existing flags; NOT gated on --sharding-report/--summary-schema-out/--run-provenance.",
+   "Run-provenance flags object records the argv token verbatim (accepted|observed|strict-observed) under key 'summary-time-range-policy' in the fixed enumeration position."
+  ],
+  "affected_prior": [
+   "round 11 sharding-report first_ts/last_ts corpus (observed must equal it)",
+   "round 12 run-provenance flags enumeration (new key summary-time-range-policy)",
+   "default summary.time_range block in --output"
+  ],
+  "summary": "Add --summary-time-range-policy <accepted|observed|strict-observed> to control whether summary.time_range covers accepted events only, all RFC3339-UTC-timestamped JSON-parseable lines, or enforces equality of the two with cleanup-on-divergence."
+ },
+ "instruction_head": "# Summary Time Range Policy\n\n`summary.time_range` currently reflects accepted events only, while the\nsharding report's `first_ts` and `last_ts` fields reflect every JSON-parseable\nline with a conforming UTC timestamp, even if the event is later rejected. Add\n`--summary-time-range-policy <accepted|observed|strict-observed>` so operators\ncan keep the accepted-only behavior, opt into the broader observed range, or\nenforce that the accepted and observed ranges coincide.\n\nThe default `accepted` polic"
+}

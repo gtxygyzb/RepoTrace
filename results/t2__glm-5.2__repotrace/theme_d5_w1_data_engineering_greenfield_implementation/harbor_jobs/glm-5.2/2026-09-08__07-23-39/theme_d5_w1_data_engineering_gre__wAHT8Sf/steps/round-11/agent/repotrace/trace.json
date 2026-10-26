@@ -1,0 +1,862 @@
+[
+ {
+  "round": 1,
+  "root": "/app",
+  "graph": {
+   "n_files": 0,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": []
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "go.mod",
+    "main.go"
+   ],
+   "target_symbols": [
+    "main",
+    "ingest",
+    "query",
+    "loadRates",
+    "enumerateShards",
+    "buildArrivalStream",
+    "validateEvent",
+    "applyWatermark",
+    "dedup",
+    "resolveChargebacks",
+    "aggregate",
+    "writeSummary",
+    "writeRejects"
+   ],
+   "behavior_constraints": [
+    "Builds offline into a single executable at /app/eventq using only Go stdlib or vendored modules",
+    "ingest subcommand requires --input-dir, --rates, --output, --rejects, --session-gap, --watermark-lag; missing/empty/out-of-range (--session-gap<=0, --watermark-lag<0) exits 2 with 'error: ingest requires --input-dir, --rates, --output, --rejects, --session-gap, --watermark-lag'",
+    "FX file is validated before any event is read; failures exit 2 with exact messages 'error: fx base must be USD', 'error: fx days invalid', 'error: fx rates must include USD=1.0', 'error: fx rates must be positive finite' and must not create/overwrite --output or --rejects",
+    "A shard is counted only if it is a regular file (no symlinks of any kind), name ends with .ndjson, and does not begin with '.'; all other entries ignored",
+    "Shards are sorted by bare filename ascending; each shard's non-blank lines are concatenated in original order into the arrival stream with (shard_name, line_index) metadata",
+    "Blank/whitespace-only lines are ignored, not rejected",
+    "Schema v1 and v2 are validated per field rules; unknown fields silently dropped; mixing v1/v2 fields is invalid; bad JSON (incl NaN/Infinity) is rejected",
+    "Amount rules: v1 amount required for purchase/refund and absent for signup/login/chargeback; v2 amount_cents non-negative integer required for purchase/refund and absent otherwise; negative/non-finite amounts invalid",
+    "currency required on purchase/refund and absent otherwise; must exist in the event's UTC date rate map or event is rejected (non-fatal)",
+    "ts must be RFC3339 UTC form YYYY-MM-DDTHH:MM:SSZ with no offsets or fractional seconds"
+   ],
+   "affected_prior": [],
+   "summary": "Round 1 demands implementing the eventq CLI from scratch in Go (stdlib only, offline build) with ingest and query subcommands that validate FX, enumerate/merge NDJSON shards, apply watermark/dedup/chargeback rules, and produce deterministic JSON summary plus rejects."
+  },
+  "instruction_head": "# Event Ingestion CLI \u2014 `eventq`\n\nWe are building a data-engineering command-line tool that turns raw event logs into clean, currency-normalized summaries. Please implement it from scratch in Go under `/app`. The tool must build into a single executable at `/app/eventq`. The build must be offline (the container has no network at solve time); either vendor your modules or use only the Go standard library. The environment already has Go 1.22.\n\nThe overall shape is an `ingest` subcommand that reads"
+ },
+ {
+  "round": 2,
+  "root": "/app",
+  "graph": {
+   "n_files": 0,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": []
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go"
+   ],
+   "target_symbols": [
+    "ingest",
+    "loadState",
+    "saveState",
+    "State",
+    "PendingPurchase",
+    "OpenSession",
+    "Watermark",
+    "classifyEvent",
+    "applyPendingTTL",
+    "capOpenSessions"
+   ],
+   "behavior_constraints": [
+    "New flags --state-in, --state-out, --pending-ttl, --max-open-sessions are accepted by ingest; unknown/malformed flags exit 2 with base usage-error string.",
+    "If --state-in omitted or file does not exist, treat as cold start (empty state); a missing --state-in file is not an error.",
+    "If --state-in points to an existing file with parsed version != 1, exit 2 with stderr 'error: state version unsupported' and do not write --state-out.",
+    "If --max-open-sessions is negative, exit 2 with the base usage-error string.",
+    "If neither --state-in nor --state-out is supplied, ingest behaves exactly like base behavior (no persistence, no state_stats block, no TTL logic even if --pending-ttl present).",
+    "--state-out is written atomically: build full payload in memory, write to <state-out>.tmp, then rename to <state-out>; on any non-zero exit the .tmp must not remain and the target file must be unchanged.",
+    "State file is a single JSON object with top-level keys in exact order: version, watermark, seen_ids, pending_purchases, open_sessions, run_index; two-space indentation; ends with exactly one \\n; no trailing whitespace.",
+    "version is always 1.",
+    "watermark inner key order is has_max then max_ts; max_ts is literal null when has_max is false, else a JSON string in YYYY-MM-DDTHH:MM:SSZ form.",
+    "watermark.has_max is true iff at least one event has ever been admitted past the watermark (passed schema/FX, not late-rejected, not cross-run duplicate) across all contributing runs."
+   ],
+   "affected_prior": [
+    "ingest",
+    "main",
+    "loadRates",
+    "enumerateShards"
+   ],
+   "summary": "Round 2 extends ingest with durable cross-run state (dedup set, watermark, pending purchases, open sessions) via --state-in/--state-out/--pending-ttl/--max-open-sessions flags, atomic state file writes, and an explicit four-bucket event classification while preserving base semantics."
+  },
+  "instruction_head": "# Incremental Ingest with Durable State\n\nExtend `eventq ingest` so that a sequence of ingest runs can process an event stream **incrementally** while preserving the same semantics that a single monolithic run over all inputs would have produced. This requires a durable state file that captures everything the pipeline needs to carry across runs: the dedup identity set, the advancing watermark, and the set of surviving purchases that remain eligible for a future chargeback. Everything from default"
+ },
+ {
+  "round": 3,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [
+     "main.go"
+    ],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "main.go",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go"
+   ],
+   "target_symbols": [
+    "ingest",
+    "saveState",
+    "State"
+   ],
+   "behavior_constraints": [
+    "New --audit-log <path> flag is optional; when omitted, all existing outputs (--output, --rejects, --state-out) are byte-for-byte identical to stateful ingest without the flag.",
+    "When --audit-log is supplied, write an NDJSON file with exactly one JSON object per current-run event in arrival-stream order (shard_name lex asc, then 1-based line index asc).",
+    "Carry-over entries from state.pending_purchases are NEVER recorded in the audit log.",
+    "Each audit record has fixed key order: id, ts, type, shard, line, bucket, then bucket-specific keys.",
+    "id/ts/type are emitted as-is from input (null if missing or non-string); shard is basename; line is 1-based.",
+    "bucket is exactly one of: accepted, invalid, late, duplicate, unresolved_chargeback.",
+    "accepted bucket includes usd (FX-converted for purchase/refund, 0.00 for chargeback/login/signup), session_index (1-based, honoring carry-over), resolved_against (current_run|carry_over|null).",
+    "invalid bucket reason uses first-matching-check order: schema_version, missing_id, missing_ts|bad_ts, missing_type|bad_type, missing_user, missing_amount|bad_amount, missing_currency|bad_currency, missing_ref_id, fx_lookup.",
+    "late bucket records cutoff (ISO ts) in force at the moment of the late decision (state.watermark.max_ts - watermark_lag or max_ts_seen_so_far - watermark_lag).",
+    "duplicate bucket reason is cross_run if id in state.seen_ids (supersedes same_run for every current-run occurrence), otherwise same_run."
+   ],
+   "affected_prior": [
+    "ingest",
+    "saveState",
+    "State"
+   ],
+   "summary": "Add an optional --audit-log flag to ingest that emits one NDJSON record per current-run event (in arrival order) capturing its classification bucket and bucket-specific metadata, written atomically without altering any existing output when absent."
+  },
+  "instruction_head": "# Deterministic Audit Log\n\nExtend `eventq ingest` with an optional per-event **audit log** that records the classification decision for every current-run event in arrival order. This is a new output file that enables forensic replay without re-running the pipeline. Everything from existing base and stateful behavior still holds: same input formats, same validation/watermark/dedup/chargeback pipeline, same arrival-stream ordering, same state file semantics, same byte-for-byte `--output`/`--reject"
+ },
+ {
+  "round": 4,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "main.go",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go"
+   ],
+   "target_symbols": [
+    "ingest",
+    "parseEvent",
+    "loadRates",
+    "loadRateMap",
+    "rate",
+    "usageError",
+    "newContext",
+    "readInputEvents"
+   ],
+   "behavior_constraints": [
+    "`fx_lookup` audit-log reason code is retired; replaced by `fx_unknown_currency` (currency not a key in any day's rates map) and `fx_no_rate_for_date` (currency known but no entry for the event's date-day).",
+    "Precedence slot 9 is split into 9a fx_unknown_currency, 9b fx_no_rate_for_date, 9c fx_bad_rate; slots 1-8 (schema_version, missing_id, missing_ts/bad_ts, missing_type/bad_type, missing_user, missing_amount/bad_amount, missing_currency/bad_currency, missing_ref_id) remain unchanged and win over any FX code.",
+    "New valueless flag `--rates-strict` (default off). Passing a value (e.g. `--rates-strict=foo`) is a usage error: exit 2 with existing usage-error string.",
+    "Without `--rates-strict`: a known currency with a rate entry for the date-day whose value is unusable (NaN, +Inf, -Inf, 0 including -0, or any negative finite number) is REJECTED with reason `fx_no_rate_for_date`.",
+    "With `--rates-strict`: the same unusable-rate case is REJECTED with reason `fx_bad_rate` instead; all other FX outcomes unchanged. `fx_bad_rate` is emitted ONLY under `--rates-strict`.",
+    "`--rates-strict` never changes `--output`, `--rejects`, or `--state-out` bytes; only audit-log `reason` field and (transitively) audit digest `invalid_reasons` histogram and `sha256` differ between modes.",
+    "On empty input directory or when no event reaches the FX-lookup step, `--rates-strict` is a pure no-op across all four output streams.",
+    "New optional integer flag `--rates-max-staleness` (seconds, default 0 = off). Negative value is a usage error (exit 2).",
+    "When `--rates-max-staleness` N > 0 and the exact-day rate is missing for a known currency, scan every day where the currency has a rate entry to find a fallback (exact-day rate still preferred when present; fx_fallback_days = 0 then).",
+    "When N == 0 and exact-day rate missing, event is rejected with `fx_no_rate_for_date` (unchanged strict-rates default)."
+   ],
+   "affected_prior": [
+    "ingest audit-log classification (round 3)",
+    "FX lookup / rate resolution logic in loadRates/rate/loadRateMap (round 1)",
+    "audit digest invalid_reasons histogram (round 3)",
+    "ingest flag parsing (round 1/2/3)"
+   ],
+   "summary": "This round retires the coarse `fx_lookup` audit reason by splitting it into `fx_unknown_currency` and `fx_no_rate_for_date`, adds a valueless `--rates-strict` flag that emits `fx_bad_rate` for unusable rate entries, and adds `--rates-max-staleness` to enable cross-day fallback rate resolution, while keeping all non-audit output streams byte-identical to prior rounds."
+  },
+  "instruction_head": "## Strict Rates and FX Reason Corrections\n\nThe audit log currently classifies FX-lookup failures under a single reason\ncode, `fx_lookup`. That is too coarse: two operationally different failure\nmodes (unknown currency vs. missing rate entry for a specific date-day) are\nlumped together. Split `fx_lookup` into two distinct codes, add an optional\n`--rates-strict` flag that additionally distinguishes unusable rate entries,\nand extend the audit artifacts with fallback/digest metadata described below."
+ },
+ {
+  "round": 5,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "main.go",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go"
+   ],
+   "target_symbols": [
+    "ingest",
+    "writeManifest",
+    "writeManifestSignature",
+    "parseArgs",
+    "loadState",
+    "loadRates"
+   ],
+   "behavior_constraints": [
+    "--ingest-id must match ^[A-Za-z0-9][A-Za-z0-9_.:-]*$ and be 1..128 chars; otherwise exit 2 with exact stderr 'ingest: --ingest-id: invalid (must match ^[A-Za-z0-9][A-Za-z0-9_.:-]*$, 1..128 chars)'",
+    "When --ingest-id is absent, manifest ingest_id is JSON null (not empty string)",
+    "--ingest-id alone (without --out-parquet-manifest) is a byte-for-byte no-op for --output, --rejects, --state-out, --audit-log, --audit-log-digest",
+    "When neither new flag is passed, behavior is byte-for-byte identical to the strict-rates feature",
+    "--out-parquet-manifest writes pretty-printed JSON (2-space indent, trailing newline) with top-level keys in exact order: schema_version, ingest_id, run_index, rates_digest, input_shards, outputs, window",
+    "schema_version is always the literal 'eventq.manifest/v1'",
+    "run_index = priorState.run_index + 1 when --state-in points to existing valid state; otherwise 1 (cold start or missing file)",
+    "rates_digest is 64-char lowercase hex, always present (never null)",
+    "input_shards array sorted by basename ASCII-ascending; each record has keys in order: shard, sha256, bytes, events_total, events_accepted",
+    "events_total counts non-blank lines; events_accepted counts lines whose final audit-bucket is accepted (late/invalid/duplicate/unresolved_chargeback excluded)"
+   ],
+   "affected_prior": [
+    "ingest",
+    "loadState",
+    "loadRates/loadRateMap (rates_digest)",
+    "audit-log digest (bucket_counts semantics)",
+    "saveState (run_index)"
+   ],
+   "summary": "Add an optional per-run ingest manifest (--out-parquet-manifest) with --ingest-id label and optional --manifest-signature sidecar, emitting deterministic pretty-printed JSON describing the run without altering existing output bytes."
+  },
+  "instruction_head": "## Ingest Manifest (`--out-parquet-manifest` + `--ingest-id`)\n\nAdd a new user-visible capability \u2014 a per-run **ingest manifest** \u2014 without changing any of the output bytes produced by existing flags. Two new flags are introduced and work in combination:\n\n- `--ingest-id <string>`: an optional, user-supplied label for the run.\n- `--out-parquet-manifest <path>`: an optional path; when set, the CLI writes a JSON manifest describing the run.\n\nWhen neither new flag is passed, the CLI behaves byte-for-"
+ },
+ {
+  "round": 6,
+  "root": "/app",
+  "graph": {
+   "n_files": 5,
+   "n_edges": 5,
+   "delta": {
+    "files_added": [
+     "cli.go",
+     "helpers.go",
+     "manifest.go",
+     "types.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "cli.go",
+      "helpers.go"
+     ],
+     [
+      "cli.go",
+      "main.go"
+     ],
+     [
+      "cli.go",
+      "manifest.go"
+     ],
+     [
+      "main.go",
+      "helpers.go"
+     ],
+     [
+      "manifest.go",
+      "helpers.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "helpers.go",
+     "pagerank": 0.431417,
+     "fan_in": 3,
+     "fan_out": 0
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.159784,
+     "fan_in": 1,
+     "fan_out": 1
+    },
+    {
+     "file": "manifest.go",
+     "pagerank": 0.159784,
+     "fan_in": 1,
+     "fan_out": 1
+    },
+    {
+     "file": "cli.go",
+     "pagerank": 0.124507,
+     "fan_in": 0,
+     "fan_out": 3
+    },
+    {
+     "file": "types.go",
+     "pagerank": 0.124507,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cli.go",
+    "main.go",
+    "types.go"
+   ],
+   "target_symbols": [
+    "parseArgs",
+    "nextArg",
+    "run",
+    "parseEvent",
+    "loadState",
+    "buildStateOut",
+    "statePendingOutList",
+    "stateOpenSessionOutList",
+    "MarshalJSON",
+    "sortedPending",
+    "sortedOpenSessions",
+    "sortedCarriedSessions",
+    "sortedSeenIDs",
+    "bucketCode",
+    "buildManifest"
+   ],
+   "behavior_constraints": [
+    "--dedup-policy accepts exactly {first-arrival, lex-largest-ts}; unknown/empty value exits 2 with stderr line: ingest: --dedup-policy: must be one of {first-arrival, lex-largest-ts}",
+    "Omitting --dedup-policy or setting lex-largest-ts yields byte-for-byte identical output, rejects, state-out, audit-log, audit-log-digest, and manifest vs. prior round behavior",
+    "Under first-arrival, winner in a same-run duplicate group is the event with smallest (shard_basename, line_index); ts is not consulted",
+    "Cross-run dedup against state.seen_ids is unchanged by policy; cross_run duplicates remain unaffected",
+    "Rejects file still four-bucket layout in arrival order; duplicate bucket contains the non-winners under the active policy",
+    "anomalies.duplicate count unchanged between policies for same input",
+    "Audit log: same_run duplicate records under first-arrival carry winner_arrival={shard,line} immediately after reason; never emitted under lex-largest-ts/default; never on cross_run; never on non-duplicate buckets",
+    "Audit-log-digest duplicate_reasons still has exactly same_run and cross_run counts; winner_arrival is not surfaced in digest",
+    "When --audit-log-digest, --audit-log, and --dedup-policy are all set, digest gains dedup_policy_stats block positioned after resolved_against and before sha256",
+    "Flag composes freely with state, audit log, manifest, rates-strict, FX staleness flags"
+   ],
+   "affected_prior": [
+    "ingest dedup/winner selection (round 1-2)",
+    "audit-log duplicate records (round 3)",
+    "audit-log-digest block layout (round 3)",
+    "manifest feature defaults (round 5)"
+   ],
+   "summary": "This round adds an optional --dedup-policy flag to eventq ingest selecting between the existing lex-largest-ts winner rule (default, byte-compatible) and a new first-arrival rule that picks the earliest (shard_basename, line_index) duplicate-group survivor, surfaces a winner_arrival object on same_run duplicate audit records only under first-arrival, and adds a dedup_policy_stats block to the audit-log digest when policy is set."
+  },
+  "instruction_head": "# Configurable Dedup Policy\n\nSame-run duplicate handling now has an explicit policy selector:\n`--dedup-policy <first-arrival|lex-largest-ts>`. The default keeps the existing\nwinner rule: the lexicographically largest `ts` wins, with arrival order used\nas the tie-breaker. The `first-arrival` policy deliberately chooses the event\nwith the smallest `(shard_basename, line_index)` in the duplicate group,\nignoring `ts` for winner selection.\n\nThis means a duplicate group with increasing timestamps acro"
+ },
+ {
+  "round": 7,
+  "root": "/app",
+  "graph": {
+   "n_files": 5,
+   "n_edges": 5,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "helpers.go",
+     "pagerank": 0.431417,
+     "fan_in": 3,
+     "fan_out": 0
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.159784,
+     "fan_in": 1,
+     "fan_out": 1
+    },
+    {
+     "file": "manifest.go",
+     "pagerank": 0.159784,
+     "fan_in": 1,
+     "fan_out": 1
+    },
+    {
+     "file": "cli.go",
+     "pagerank": 0.124507,
+     "fan_in": 0,
+     "fan_out": 3
+    },
+    {
+     "file": "types.go",
+     "pagerank": 0.124507,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "main.go",
+    "cli.go",
+    "types.go"
+   ],
+   "target_symbols": [
+    "parseArgs",
+    "nextArg",
+    "run",
+    "ingest",
+    "loadState",
+    "saveState",
+    "buildAuditDigest",
+    "writeAuditLog",
+    "State",
+    "PendingPurchase",
+    "marshalLateAuditRecord"
+   ],
+   "behavior_constraints": [
+    "Adding --strict-late-audit takes no value; passing --strict-late-audit=true is a usage error with exit 2",
+    "Supplying --strict-late-audit without --audit-log emits exactly 'ingest: --strict-late-audit requires --audit-log' on stderr and exits 2 with no output files created",
+    "Every late audit record's cutoff MUST be a JSON object with exactly two keys in order: {\"value\": \"<YYYY-MM-DDTHH:MM:SSZ>\", \"epoch_seconds\": <int>}",
+    "cutoff.value must be 20-char strict RFC3339 UTC with Z suffix matching ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+    "cutoff.epoch_seconds is a bare JSON integer equal to Unix seconds for value; negative computed epoch clamps to {\"1970-01-01T00:00:00Z\", 0}",
+    "When --strict-late-audit is supplied, every late audit record gains watermark_lag_seconds (int, run-wide --watermark-lag value) and late_by_seconds (int, cutoff_epoch - event_ts_epoch, always positive) appended immediately after cutoff in that order",
+    "late record has 9 keys under --strict-late-audit in exact order: id, ts, type, shard, line, bucket, cutoff, watermark_lag_seconds, late_by_seconds",
+    "Without --strict-late-audit, late record has 7 keys with structured cutoff but no watermark_lag_seconds/late_by_seconds",
+    "--audit-log-digest emits new top-level block late_cutoff_stats positioned immediately after duplicate_reasons and immediately before resolved_against, always emitted regardless of flag or presence of late records",
+    "late_cutoff_stats has count, min_cutoff_epoch, max_cutoff_epoch as bare JSON integers; when count==0, min and max are 0"
+   ],
+   "affected_prior": [
+    "audit-log feature (round 3 late cutoff rendering)",
+    "manifest (round 5 state/audit_log/audit_digest entries)",
+    "state schema (round 2 pending_purchases)",
+    "dedup-policy feature (round 6)"
+   ],
+   "summary": "This round restructures every late audit record's cutoff into a {value, epoch_seconds} object, adds --strict-late-audit to expose watermark_lag_seconds and late_by_seconds, adds late_cutoff_stats to the audit digest, and (per intro) introduces --audit-log-rotate-bytes and --state-strict plus first_seen_epoch on pending_purchases."
+  },
+  "instruction_head": "# Structured Late Audit Cutoffs and Audit Log Rotation\n\nLate audit records need to carry enough information for downstream tools to\nreconstruct the watermark decision without guessing how a timestamp string was\nformatted. The `cutoff` value in every `late` audit record is now a structured\nJSON object with exactly two keys in this order:\n`{\"value\": \"<RFC3339-UTC-Z>\", \"epoch_seconds\": <int>}`. The `value` field is\nthe canonical UTC string matching the event timestamp format, and\n`epoch_seconds` is"
+ },
+ {
+  "round": 8,
+  "root": "/app",
+  "graph": {
+   "n_files": 5,
+   "n_edges": 5,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "helpers.go",
+     "pagerank": 0.431417,
+     "fan_in": 3,
+     "fan_out": 0
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.159784,
+     "fan_in": 1,
+     "fan_out": 1
+    },
+    {
+     "file": "manifest.go",
+     "pagerank": 0.159784,
+     "fan_in": 1,
+     "fan_out": 1
+    },
+    {
+     "file": "cli.go",
+     "pagerank": 0.124507,
+     "fan_in": 0,
+     "fan_out": 3
+    },
+    {
+     "file": "types.go",
+     "pagerank": 0.124507,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cli.go",
+    "main.go",
+    "types.go",
+    "helpers.go"
+   ],
+   "target_symbols": [
+    "parseArgs",
+    "nextArg",
+    "run",
+    "atomicWriteFile",
+    "parentDirExists",
+    "fileDigest",
+    "sha256Hex",
+    "buildManifest",
+    "buildSummarySchema",
+    "classifySummaryType",
+    "summaryDescriptor",
+    "writeSummarySchema",
+    "writeSummarySchemaDigest",
+    "writeSummarySchemaIndex"
+   ],
+   "behavior_constraints": [
+    "Add four new optional flags: --summary-schema-out <path>, --summary-schema-digest <path>, --summary-schema-strict, --summary-schema-index <path>",
+    "When all four new flags are absent, every existing output (--output, --rejects, --state-out, --audit-log, --audit-log-digest, --out-parquet-manifest, --manifest-signature) remains byte-for-byte unchanged; no runtime-derived field is added to any existing output",
+    "Empty value for --summary-schema-out (or --summary-schema-digest/--summary-schema-index) is a usage error: exit code 2, no output files created, stderr 'ingest: --summary-schema-out: value must be non-empty' (parse-time check)",
+    "Parent directory of --summary-schema-out path must already exist; otherwise exit 2, no output files created, stderr 'ingest --summary-schema-out parent directory does not exist'",
+    "Parent directory of --summary-schema-digest path must already exist; otherwise exit 2, no output files created, stderr 'ingest --summary-schema-digest parent directory does not exist'",
+    "--summary-schema-digest without --summary-schema-out is an error: exit 2, no output files created, stderr 'ingest: --summary-schema-digest requires --summary-schema-out'",
+    "Validation order: empty-value check at parse time; parent-directory-exists and cross-flag dependency checks run before any output file is written",
+    "Schema sidecar is written after every other output (except optional digest sidecar) including after --output, derived deterministically from the bytes just written to --output",
+    "Schema sidecar is pretty-printed JSON with 2-space indentation and a trailing newline, written atomically via .tmp+rename (same discipline as --out-parquet-manifest)",
+    "Top-level keys of schema sidecar appear in exact order: schema_version, summary_schema, ingest_id, run_index, field_summary, strict_mode"
+   ],
+   "affected_prior": [
+    "parseArgs (rounds 5/6/7)",
+    "run / ingest main flow",
+    "buildManifest / writeManifest pattern (round 5)",
+    "summary --output writing logic"
+   ],
+   "summary": "This round adds optional schema-sidecar support to eventq ingest via four new flags (--summary-schema-out, --summary-schema-digest, --summary-schema-strict, --summary-schema-index) that emit deterministic read-only derivations of the just-written --output summary JSON, without altering any existing output when the flags are absent."
+  },
+  "instruction_head": "# Summary Schema Sidecars\n\nAdd optional schema-sidecar support to `eventq ingest`. The new\n`--summary-schema-out <path>` flag writes a sidecar describing the actual\ncurrent-run shape of the `--output` summary JSON. The companion\n`--summary-schema-digest <path>` flag writes a content-addressed digest for\nthat schema sidecar. `--summary-schema-strict` tightens only the schema\nsidecar derivation rules, and `--summary-schema-index <path>` writes a\nseparate index over the derived schema.\n\nThese sidec"
+ },
+ {
+  "round": 9,
+  "root": "/app",
+  "graph": {
+   "n_files": 6,
+   "n_edges": 8,
+   "delta": {
+    "files_added": [
+     "schema.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "cli.go",
+      "schema.go"
+     ],
+     [
+      "schema.go",
+      "helpers.go"
+     ],
+     [
+      "schema.go",
+      "main.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "helpers.go",
+     "pagerank": 0.407237,
+     "fan_in": 4,
+     "fan_out": 0
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.166458,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "manifest.go",
+     "pagerank": 0.116812,
+     "fan_in": 1,
+     "fan_out": 1
+    },
+    {
+     "file": "schema.go",
+     "pagerank": 0.116812,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cli.go",
+     "pagerank": 0.09634,
+     "fan_in": 0,
+     "fan_out": 4
+    },
+    {
+     "file": "types.go",
+     "pagerank": 0.09634,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cli.go",
+    "main.go",
+    "types.go"
+   ],
+   "target_symbols": [
+    "parseArgs",
+    "nextArg",
+    "run",
+    "buildRejects",
+    "ingest",
+    "buildManifest",
+    "writeAuditLog"
+   ],
+   "behavior_constraints": [
+    "`--rejects-format` accepts exactly one of {legacy, tagged, tagged-sorted}; default/omitted is legacy.",
+    "Invalid `--rejects-format` value (empty, prefix, case variant, any other token) \u2192 exit 2, no output files, stderr line exactly: `ingest: --rejects-format: must be one of {legacy, tagged, tagged-sorted}`.",
+    "`--rejects-format` missing its argument value \u2192 exit 2 (Go flag parser usage error).",
+    "`--rejects-format tagged` (or tagged-sorted) without `--audit-log` \u2192 exit 2, no output files, stderr line exactly: `ingest: --rejects-format tagged requires --audit-log`.",
+    "`--rejects-format-header` is a valueless boolean flag; supplying `=value` \u2192 exit 2 (Go flag parser error).",
+    "`--rejects-format-header` without `--rejects-format tagged` or `tagged-sorted` \u2192 exit 2, no output files, stderr line exactly: `ingest: --rejects-format-header requires --rejects-format tagged`.",
+    "Validation order: enum-value check at parse time; both dependency checks run before any output file (including `.tmp`) is written.",
+    "`legacy` format (default or explicit) is byte-for-byte identical to existing rejects output, with and without `--dedup-policy first-arrival`.",
+    "`tagged` format: every non-empty reject is one line terminated by exactly one `\\n`; no leading/trailing blank lines.",
+    "Tagged column layout (no first-arrival dedup): exactly 5 tab-separated columns `<bucket>\\t<reason_code>\\t<shard>\\t<line_no>\\t<raw_line>\\n`."
+   ],
+   "affected_prior": [
+    "buildRejects (round 3 rejects output)",
+    "writeAuditLog / audit-log feature (round 3) \u2014 tagged rejects is a projection of audit-log reject records",
+    "--dedup-policy first-arrival trailing columns (round 6)",
+    "buildManifest / writeManifest / writeSignature (round 5) \u2014 manifest/signature must reflect chosen rejects bytes",
+    "schema sidecar digest (round 8) \u2014 schema/digest must reflect chosen rejects bytes",
+    "ingest (rounds 4, 7) \u2014 flow must plumb rejects-format config"
+   ],
+   "summary": "Round 9 adds a `--rejects-format <legacy|tagged|tagged-sorted>` selector and `--rejects-format-header` flag to `eventq ingest`, emitting a canonical tab-separated tagged rejects file (projected from audit-log reject records) with strict validation, while keeping legacy output byte-identical and ensuring digest/schema/manifest/signature reflect the chosen rejects bytes."
+  },
+  "instruction_head": "# Canonical Rejects Formats\n\nThe existing `--rejects` file records rejected raw lines, but it does not by\nitself expose the reject bucket, reason code, shard, or line number for each\nrow. Add an explicit `--rejects-format <legacy|tagged|tagged-sorted>` selector\nand a canonical tagged shape so downstream consumers can read that metadata\nwithout replaying the pipeline or cross-referencing the audit log.\n\n`legacy` is the default and preserves the existing on-disk reject bytes.\n`tagged` emits bucket"
+ },
+ {
+  "round": 10,
+  "root": "/app",
+  "graph": {
+   "n_files": 6,
+   "n_edges": 8,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "helpers.go",
+     "pagerank": 0.407237,
+     "fan_in": 4,
+     "fan_out": 0
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.166458,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "manifest.go",
+     "pagerank": 0.116812,
+     "fan_in": 1,
+     "fan_out": 1
+    },
+    {
+     "file": "schema.go",
+     "pagerank": 0.116812,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cli.go",
+     "pagerank": 0.09634,
+     "fan_in": 0,
+     "fan_out": 4
+    },
+    {
+     "file": "types.go",
+     "pagerank": 0.09634,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cli.go",
+    "main.go",
+    "types.go"
+   ],
+   "target_symbols": [
+    "parseArgs",
+    "nextArg",
+    "run",
+    "ingest",
+    "loadState",
+    "sortedCarriedSessions",
+    "sortedOpenSessions",
+    "stateOpenSessionOutList"
+   ],
+   "behavior_constraints": [
+    "--session-policy accepts exactly gap, fixed-window, or hybrid; default is gap when omitted",
+    "Invalid --session-policy value \u2192 exit 2, no output files, stderr: 'ingest: --session-policy: must be one of {gap, fixed-window, hybrid}'",
+    "--fixed-window-seconds required when --session-policy is fixed-window or hybrid; missing \u2192 exit 2 with specific stderr line per policy",
+    "--fixed-window-seconds must be >= 1; zero or negative with fixed-window/hybrid \u2192 exit 2, stderr: 'ingest: --fixed-window-seconds: must be a positive integer'",
+    "Supplying --fixed-window-seconds with gap (or omitted) \u2192 exit 2, stderr: 'ingest: --fixed-window-seconds requires --session-policy fixed-window or hybrid'",
+    "All validation runs before any output file is written",
+    "gap policy produces byte-for-byte identical output to existing behavior across all outputs",
+    "fixed-window replaces gap rule only for summary.sessions.total: bucket events by floor(first_ts/W)*W anchored windows, count distinct windows per user",
+    "hybrid combines gap and fixed-window: new session when either gap exceeds threshold or window boundary crossed",
+    "summary.sessions.by_user[] remains byte-identical under all policies"
+   ],
+   "affected_prior": [
+    "ingest",
+    "parseArgs",
+    "run",
+    "loadState",
+    "sortedCarriedSessions",
+    "sortedOpenSessions"
+   ],
+   "summary": "Add --session-policy and --fixed-window-seconds flags that control only summary.sessions.total computation via gap (default, unchanged), fixed-window, or hybrid rules while leaving all other session-numbered outputs gap-based."
+  },
+  "instruction_head": "# Configurable Session Policy\n\nAdd `--session-policy <gap|fixed-window|hybrid>` and\n`--fixed-window-seconds <int>` to control how `summary.sessions.total` is\ncomputed.\n\nThe default `gap` policy preserves the existing inactivity-based rule: start a\nnew session whenever the gap between consecutive surviving events for a user is\nstrictly greater than `--session-gap`, with open-session carry-over across\nruns. `fixed-window` replaces that rule for `summary.sessions.total` by\nbucketting each user's su"
+ },
+ {
+  "round": 11,
+  "root": "/app",
+  "graph": {
+   "n_files": 6,
+   "n_edges": 8,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "helpers.go",
+     "pagerank": 0.407237,
+     "fan_in": 4,
+     "fan_out": 0
+    },
+    {
+     "file": "main.go",
+     "pagerank": 0.166458,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "manifest.go",
+     "pagerank": 0.116812,
+     "fan_in": 1,
+     "fan_out": 1
+    },
+    {
+     "file": "schema.go",
+     "pagerank": 0.116812,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cli.go",
+     "pagerank": 0.09634,
+     "fan_in": 0,
+     "fan_out": 4
+    },
+    {
+     "file": "types.go",
+     "pagerank": 0.09634,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cli.go",
+    "main.go",
+    "types.go",
+    "helpers.go"
+   ],
+   "target_symbols": [
+    "parseArgs",
+    "nextArg",
+    "run",
+    "buildManifest",
+    "ingest",
+    "loadState",
+    "atomicWriteFile",
+    "parentDirExists",
+    "fileDigest",
+    "sha256Hex",
+    "sha256Short"
+   ],
+   "behavior_constraints": [
+    "When all six sharding-report flags are absent, every existing output (--output, --rejects, manifest, audit log, schema sidecars) is byte-for-byte unchanged.",
+    "Supplying any sharding-report flag does not alter existing outputs; only the requested sidecar files appear.",
+    "--sharding-report requires a non-empty value; empty value exits 2 with stderr 'ingest: --sharding-report: value must be non-empty' and creates no output files.",
+    "--sharding-report parent directory must already exist; otherwise exit 2 with stderr 'ingest --sharding-report parent directory does not exist', before any output file is written.",
+    "--sharding-report-digest requires a non-empty value; empty exits 2 with 'ingest: --sharding-report-digest: value must be non-empty'.",
+    "--sharding-report-digest without --sharding-report exits 2 with 'ingest: --sharding-report-digest requires --sharding-report'.",
+    "--sharding-report-digest parent directory must exist; else exit 2 with 'ingest --sharding-report-digest parent directory does not exist'.",
+    "--sharding-report-index requires a non-empty value; empty exits 2 with 'ingest: --sharding-report-index: value must be non-empty'.",
+    "--sharding-report-index without BOTH --sharding-report and --sharding-report-digest exits 2 with 'ingest: --sharding-report-index requires --sharding-report and --sharding-report-digest'.",
+    "--sharding-report-index parent directory must exist; else exit 2 with 'ingest --sharding-report-index parent directory does not exist'."
+   ],
+   "affected_prior": [
+    "round 5 ingest manifest input_shards summary (writeManifest/buildManifest)",
+    "parseArgs flag handling",
+    "run orchestration/validation order"
+   ],
+   "summary": "This round adds a standalone sharding-report sidecar family (--sharding-report, -digest, -index, -histogram, -sort, -strict) to eventq ingest that emits per-shard bytes, hashes, bucket counts, and timestamp ranges with basename/bytes/sha256 sort modes and strict validation, leaving existing outputs byte-identical when the flags are absent."
+  },
+  "instruction_head": "# Sharding Report Sidecars\n\nThe manifest's `input_shards` array gives only a coarse per-shard summary.\nAdd a standalone sharding-report family for consumers that need per-shard\nbytes, hashes, bucket counts, and observed timestamp ranges without\nre-parsing `--audit-log` or cross-referencing `--rejects`.\n\n`eventq ingest` now accepts exactly six new optional flags:\n`--sharding-report`, `--sharding-report-digest`,\n`--sharding-report-index`, `--sharding-report-histogram`,\n`--sharding-report-sort`, an"
+ }
+]

@@ -1,0 +1,545 @@
+[
+ {
+  "round": 1,
+  "root": "/app",
+  "graph": {
+   "n_files": 0,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": []
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/repro-verify/main.go",
+    "docs/spec_v1.md"
+   ],
+   "target_symbols": [
+    "main",
+    "manifest parser",
+    "dependency graph builder",
+    "verification runner",
+    "JSON report generator"
+   ],
+   "behavior_constraints": [
+    "Provides a CLI entry point at cmd/repro-verify that can be built with `go build -o repro-verify ./cmd/repro-verify` from /app",
+    "Parses pipeline manifests as input",
+    "Builds a dependency graph from parsed manifests",
+    "Executes multi-pass verification runs over the pipeline",
+    "Produces detailed JSON reports of verification results",
+    "Conforms to the behavior defined in /app/docs/spec_v1.md"
+   ],
+   "affected_prior": [],
+   "summary": "Implement the repro-verify CLI tool from scratch per spec_v1.md, covering manifest parsing, dependency-graph construction, multi-pass verification execution, and JSON report generation."
+  },
+  "instruction_head": "Implement the `repro-verify` tool according to `/app/docs/spec_v1.md`. The spec defines a CLI tool for verifying computational pipeline reproducibility \u2014 it parses pipeline manifests, builds dependency graphs, executes multi-pass verification runs, and produces detailed JSON reports. Build it with `go build -o repro-verify ./cmd/repro-verify` from `/app`.\n"
+ },
+ {
+  "round": 2,
+  "root": "/app",
+  "graph": {
+   "n_files": 6,
+   "n_edges": 11,
+   "delta": {
+    "files_added": [
+     "cmd/repro-verify/fingerprint.go",
+     "cmd/repro-verify/graph.go",
+     "cmd/repro-verify/main.go",
+     "cmd/repro-verify/manifest.go",
+     "cmd/repro-verify/util.go",
+     "cmd/repro-verify/verify.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "cmd/repro-verify/fingerprint.go",
+      "cmd/repro-verify/util.go"
+     ],
+     [
+      "cmd/repro-verify/graph.go",
+      "cmd/repro-verify/manifest.go"
+     ],
+     [
+      "cmd/repro-verify/graph.go",
+      "cmd/repro-verify/util.go"
+     ],
+     [
+      "cmd/repro-verify/main.go",
+      "cmd/repro-verify/fingerprint.go"
+     ],
+     [
+      "cmd/repro-verify/main.go",
+      "cmd/repro-verify/graph.go"
+     ],
+     [
+      "cmd/repro-verify/main.go",
+      "cmd/repro-verify/verify.go"
+     ],
+     [
+      "cmd/repro-verify/manifest.go",
+      "cmd/repro-verify/graph.go"
+     ],
+     [
+      "cmd/repro-verify/verify.go",
+      "cmd/repro-verify/fingerprint.go"
+     ],
+     [
+      "cmd/repro-verify/verify.go",
+      "cmd/repro-verify/graph.go"
+     ],
+     [
+      "cmd/repro-verify/verify.go",
+      "cmd/repro-verify/manifest.go"
+     ],
+     [
+      "cmd/repro-verify/verify.go",
+      "cmd/repro-verify/util.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/repro-verify/util.go",
+     "pagerank": 0.283467,
+     "fan_in": 3,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/repro-verify/graph.go",
+     "pagerank": 0.269082,
+     "fan_in": 3,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/repro-verify/manifest.go",
+     "pagerank": 0.197287,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/repro-verify/fingerprint.go",
+     "pagerank": 0.101388,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/repro-verify/verify.go",
+     "pagerank": 0.083619,
+     "fan_in": 1,
+     "fan_out": 4
+    },
+    {
+     "file": "cmd/repro-verify/main.go",
+     "pagerank": 0.065158,
+     "fan_in": 0,
+     "fan_out": 3
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/repro-verify/policy.go",
+    "cmd/repro-verify/diff.go",
+    "cmd/repro-verify/manifest.go",
+    "cmd/repro-verify/verify.go",
+    "cmd/repro-verify/main.go"
+   ],
+   "target_symbols": [
+    "evaluatePolicy",
+    "Policy",
+    "PolicyRule",
+    "PolicyEvaluation",
+    "loadManifest",
+    "verifyCmd",
+    "buildReport",
+    "exitCode",
+    "diffCmd",
+    "compareReports",
+    "StepChange",
+    "DiffSummary",
+    "main"
+   ],
+   "behavior_constraints": [
+    "Manifest may contain an optional policy section with rule types allow_variance, min_consistency_rate, required_steps, and ignore_steps.",
+    "Policy rules are evaluated after normal verification and can override the effective pass/fail result.",
+    "When policy is present, the verification report JSON must include a top-level policy_evaluation object with at least policy_overall_status being PASS, FAIL, or ERROR.",
+    "When policy is present, the process exit code must follow policy_overall_status: 0 for PASS, 1 for FAIL, and 2 for ERROR instead of the raw verification result.",
+    "When policy is absent from the manifest, the report must not contain policy_evaluation and behavior must be identical to v1.",
+    "repro-verify diff <baseline.json> <current.json> compares two verification reports and emits structured JSON.",
+    "diff output must contain step_changes sorted alphabetically by step_id; each entry has step_id string and change_type one of added, removed, modified, or unchanged.",
+    "diff output must contain summary with integer fields steps_added, steps_removed, steps_modified, steps_unchanged, regressions, improvements, and total_output_changes.",
+    "If either diff input file is missing or invalid, the command must exit with code 2 and print an error message to stderr."
+   ],
+   "affected_prior": [
+    "main (CLI command dispatch)",
+    "loadManifest / manifest parser",
+    "verifyCmd / verification runner",
+    "buildReport / JSON report generator",
+    "exitCode"
+   ],
+   "summary": "Add an optional manifest policy engine that evaluates rules after verification and overrides report/exit status, and a diff subcommand that compares two verification reports into structured step changes and summary."
+  },
+  "instruction_head": "We need two new major features for `repro-verify`. The specification has been updated in `/app/docs/spec_v2.md` with full details.\n\n**Feature 1: Verification Policy Engine** \u2014 The manifest now supports an optional `policy` section with rule-based pass/fail criteria. Policy rules are evaluated after normal verification and can override the effective pass/fail result. There are four rule types: `allow_variance`, `min_consistency_rate`, `required_steps`, and `ignore_steps`.\n\nKey integration require"
+ },
+ {
+  "round": 3,
+  "root": "/app",
+  "graph": {
+   "n_files": 8,
+   "n_edges": 14,
+   "delta": {
+    "files_added": [
+     "cmd/repro-verify/diff.go",
+     "cmd/repro-verify/policy.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "cmd/repro-verify/diff.go",
+      "cmd/repro-verify/util.go"
+     ],
+     [
+      "cmd/repro-verify/main.go",
+      "cmd/repro-verify/diff.go"
+     ],
+     [
+      "cmd/repro-verify/manifest.go",
+      "cmd/repro-verify/policy.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/repro-verify/util.go",
+     "pagerank": 0.282691,
+     "fan_in": 4,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/repro-verify/graph.go",
+     "pagerank": 0.151085,
+     "fan_in": 3,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/repro-verify/manifest.go",
+     "pagerank": 0.141877,
+     "fan_in": 2,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/repro-verify/policy.go",
+     "pagerank": 0.122051,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/repro-verify/fingerprint.go",
+     "pagerank": 0.090788,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/repro-verify/diff.go",
+     "pagerank": 0.074877,
+     "fan_in": 1,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/repro-verify/verify.go",
+     "pagerank": 0.074877,
+     "fan_in": 1,
+     "fan_out": 4
+    },
+    {
+     "file": "cmd/repro-verify/main.go",
+     "pagerank": 0.061754,
+     "fan_in": 0,
+     "fan_out": 4
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/repro-verify/policy.go",
+    "cmd/repro-verify/diff.go",
+    "cmd/repro-verify/verify.go",
+    "cmd/repro-verify/main.go",
+    "cmd/repro-verify/summary.go",
+    "docs/spec_v3.md"
+   ],
+   "target_symbols": [
+    "evaluatePolicy",
+    "diffCmd",
+    "summaryCmd",
+    "buildReport",
+    "verifyCmd",
+    "loadDiffReport",
+    "main"
+   ],
+   "behavior_constraints": [
+    "The raw `overall_status` field in the verification report must always reflect the strict v1 verification result (e.g., 'FAIL' for non-deterministic output) and must NOT be modified by policy rules.",
+    "Only the exit code and the `policy_evaluation` section of the report may be affected by policy evaluation.",
+    "The diff subcommand must exit with code 1 whenever `summary.regressions >= 1`.",
+    "A new `repro-verify summary <report1.json> [report2.json ...]` subcommand must read one or more verification report files.",
+    "Summary JSON output (default) must contain a `reports` array with one entry per input file.",
+    "Each summary report entry must include: file, manifest_name, manifest_version, overall_status, step_count, pass_count, fail_count, pass_rate.",
+    "Summary JSON output must contain an `aggregate` object including: total_reports, total_steps, total_pass, total_fail, overall_pass_rate, all_passing.",
+    "Summary subcommand supports `--format json` (default) and `--format text`.",
+    "Summary text output: one line per report as `<name>@<version>  <status>  <pass>/<total> steps  (<pct>%)`, then a `---` separator, then an aggregate line.",
+    "Summary exit code 0 only when every report has overall_status == 'PASS'."
+   ],
+   "affected_prior": [
+    "evaluatePolicy (round 2)",
+    "Policy / PolicyEvaluation handling in verify.go (round 2)",
+    "diffCmd and diff summary regressions handling (round 2)",
+    "buildReport overall_status assignment (round 1)",
+    "main subcommand registration (round 1)"
+   ],
+   "summary": "This round fixes the policy engine to stop mutating the raw overall_status, fixes the diff subcommand exit code on regressions, and adds a new `repro-verify summary` subcommand that aggregates verification report statistics in JSON or text form."
+  },
+  "instruction_head": "Two changes are needed for `repro-verify`. The specification has been updated in `/app/docs/spec_v3.md` with full details.\n\n**Corrections**: We discovered two behavioral issues that need to be fixed:\n1. The policy engine incorrectly modifies the raw `overall_status` field in the verification report. The raw `overall_status` must always reflect the strict v1 verification result (e.g., `\"FAIL\"` for non-deterministic output), regardless of policy rules. Only the exit code and the `policy_evaluation"
+ },
+ {
+  "round": 4,
+  "root": "/app",
+  "graph": {
+   "n_files": 9,
+   "n_edges": 16,
+   "delta": {
+    "files_added": [
+     "cmd/repro-verify/summary.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "cmd/repro-verify/main.go",
+      "cmd/repro-verify/summary.go"
+     ],
+     [
+      "cmd/repro-verify/verify.go",
+      "cmd/repro-verify/policy.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/repro-verify/util.go",
+     "pagerank": 0.257839,
+     "fan_in": 4,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/repro-verify/graph.go",
+     "pagerank": 0.136472,
+     "fan_in": 3,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/repro-verify/manifest.go",
+     "pagerank": 0.12937,
+     "fan_in": 2,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/repro-verify/policy.go",
+     "pagerank": 0.126352,
+     "fan_in": 2,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/repro-verify/fingerprint.go",
+     "pagerank": 0.08149,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/repro-verify/diff.go",
+     "pagerank": 0.069649,
+     "fan_in": 1,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/repro-verify/summary.go",
+     "pagerank": 0.069649,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/repro-verify/verify.go",
+     "pagerank": 0.069649,
+     "fan_in": 1,
+     "fan_out": 5
+    },
+    {
+     "file": "cmd/repro-verify/main.go",
+     "pagerank": 0.059529,
+     "fan_in": 0,
+     "fan_out": 5
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/repro-verify/trend.go",
+    "cmd/repro-verify/main.go",
+    "docs/spec_v4.md"
+   ],
+   "target_symbols": [
+    "trendCmd",
+    "TrendStep",
+    "TrendReport",
+    "TrendSummary"
+   ],
+   "behavior_constraints": [
+    "trend subcommand requires at least 2 report file arguments; fewer than 2 produces an error (exit code 2)",
+    "Reports are processed in command-line order where the first argument is the oldest report",
+    "Each tracked step's statuses array has exactly one entry per report, using null when the step is absent from that report",
+    "Only transitions between consecutive non-null statuses count as status changes; null entries are skipped",
+    "stability = 1.0 - (status_changes / (appearances - 1)) where appearances is the count of non-null entries; if appearances <= 1, stability = 1.0",
+    "Classification: stable (0 changes), flaky (>=2 changes), degrading (exactly 1 change and last non-null status rank < first non-null status rank), improving (exactly 1 change and last rank > first rank)",
+    "Status rank ordering: PASS=4 > FAIL=3 > ERROR=2 > TIMEOUT=1 > SKIPPED=0",
+    "Exit code 0 only when no step is classified as degrading or flaky",
+    "Exit code 1 when at least one step is classified as degrading or flaky",
+    "Exit code 2 for usage or file-loading errors"
+   ],
+   "affected_prior": [
+    "cmd/repro-verify/main.go (subcommand registration)",
+    "cmd/repro-verify/diff.go (loadDiffReport may be reused or trend needs its own report loader)",
+    "cmd/repro-verify/verify.go (Report structure that trend reads)"
+   ],
+   "summary": "This round adds a `repro-verify trend` subcommand that analyzes status evolution across chronologically ordered verification reports, computing per-step stability scores and classifications (stable/flaky/degrading/improving) with specific exit-code semantics."
+  },
+  "instruction_head": "The specification has been updated in `/app/docs/spec_v4.md` with a new feature.\n\n**Extension**: Add a `repro-verify trend <report1.json> <report2.json> [...]` subcommand that analyzes how verification results change over time across multiple chronologically ordered reports. It tracks per-step status history, calculates stability scores, and classifies each step as stable, flaky, degrading, or improving. See spec_v4.md section 17 for the complete specification.\n\nKey integration requirements for "
+ },
+ {
+  "round": 5,
+  "root": "/app",
+  "graph": {
+   "n_files": 10,
+   "n_edges": 18,
+   "delta": {
+    "files_added": [
+     "cmd/repro-verify/trend.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "cmd/repro-verify/main.go",
+      "cmd/repro-verify/trend.go"
+     ],
+     [
+      "cmd/repro-verify/trend.go",
+      "cmd/repro-verify/util.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/repro-verify/util.go",
+     "pagerank": 0.280439,
+     "fan_in": 5,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/repro-verify/graph.go",
+     "pagerank": 0.120708,
+     "fan_in": 3,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/repro-verify/manifest.go",
+     "pagerank": 0.115374,
+     "fan_in": 2,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/repro-verify/policy.go",
+     "pagerank": 0.113106,
+     "fan_in": 2,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/repro-verify/fingerprint.go",
+     "pagerank": 0.071674,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/repro-verify/diff.go",
+     "pagerank": 0.06126,
+     "fan_in": 1,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/repro-verify/summary.go",
+     "pagerank": 0.06126,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/repro-verify/trend.go",
+     "pagerank": 0.06126,
+     "fan_in": 1,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/repro-verify/verify.go",
+     "pagerank": 0.06126,
+     "fan_in": 1,
+     "fan_out": 5
+    },
+    {
+     "file": "cmd/repro-verify/main.go",
+     "pagerank": 0.053658,
+     "fan_in": 0,
+     "fan_out": 6
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/repro-verify/trend.go",
+    "cmd/repro-verify/slice.go",
+    "cmd/repro-verify/main.go",
+    "docs/spec_v5.md"
+   ],
+   "target_symbols": [
+    "statusRank",
+    "classifyTrendStep",
+    "sliceCmd",
+    "main"
+   ],
+   "behavior_constraints": [
+    "Trend subcommand status ranks must be PASS=4, TIMEOUT=3, ERROR=2, FAIL=1, SKIPPED=0",
+    "Diff subcommand status ranks must remain unchanged (PASS=4, FAIL=3, ERROR=2, TIMEOUT=1, SKIPPED=0)",
+    "A TIMEOUT\u2192FAIL transition in trend must be classified as 'degrading'",
+    "A FAIL\u2192TIMEOUT transition in trend must be classified as 'improving'",
+    "slice subcommand filters report steps by one or more --status flags with OR matching",
+    "slice JSON output must contain: source_file, manifest_name, filter_statuses (array), total_steps (int), matched_count (int), steps (array of objects with id and status)",
+    "slice exits 0 when matched_count > 0, exits 1 when matched_count == 0, exits 2 on errors (file not found, invalid JSON, missing --status)",
+    "slice with no --status flag must exit 2 and print: error: slice requires at least one --status flag"
+   ],
+   "affected_prior": [
+    "trend subcommand (round 4) \u2014 statusRank change alters classification of FAIL/TIMEOUT/ERROR transitions",
+    "diff subcommand (round 2) \u2014 must be verified NOT to share trend's statusRank so its behavior stays unchanged",
+    "main.go subcommand registration (rounds 1-4) \u2014 must register new slice subcommand"
+   ],
+   "summary": "Correct the trend subcommand's status ranks (PASS=4, TIMEOUT=3, ERROR=2, FAIL=1, SKIPPED=0) while leaving diff ranks untouched, and add a new `repro-verify slice` subcommand that filters verification report steps by one or more --status flags with structured JSON output and 0/1/2 exit codes."
+  },
+  "instruction_head": "The specification has been updated in `/app/docs/spec_v5.md` with one correction and one new feature.\n\n**Correction (Section 18)**: The trend subcommand's status ranks for classification are revised. The previous ranks (PASS=4, FAIL=3, ERROR=2, TIMEOUT=1, SKIPPED=0) are corrected to (PASS=4, TIMEOUT=3, ERROR=2, FAIL=1, SKIPPED=0). This changes how transitions between FAIL, ERROR, and TIMEOUT are classified as degrading or improving. For example, a step going from TIMEOUT to FAIL is now \"degradin"
+ }
+]

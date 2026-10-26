@@ -1,0 +1,1208 @@
+[
+ {
+  "round": 1,
+  "root": "/app",
+  "graph": {
+   "n_files": 0,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": []
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/flowctl/main.go",
+    "go.mod",
+    "internal/config/config.go",
+    "internal/input/input.go",
+    "internal/stage/stage.go",
+    "internal/output/output.go",
+    "internal/pipeline/pipeline.go"
+   ],
+   "target_symbols": [
+    "main",
+    "Run",
+    "Config",
+    "InputConfig",
+    "StageConfig",
+    "OutputConfig",
+    "Stage",
+    "FilterStage",
+    "ProjectStage",
+    "SortStage",
+    "LimitStage",
+    "ReadInput",
+    "WriteOutput",
+    "Pipeline",
+    "ExecuteStages",
+    "ParseConfig",
+    "LoadYAML"
+   ],
+   "behavior_constraints": [
+    "Binary builds via `go build -o /app/flowctl ./cmd/flowctl` from /app/ with no third-party deps",
+    "Module path is example.com/flowctl using only Go stdlib",
+    "Invocation: /app/flowctl run --config <path> [--strict]; unknown subcommand/flag exits non-zero with single stderr line starting 'flowctl: '",
+    "Missing input/stages/output top-level key is a config error with stderr starting 'flowctl: config:'",
+    "input.path resolved relative to config file directory; input.format must be csv or ndjson else config error",
+    "CSV: header row defines field names; rows with mismatched column count abort the run non-zero",
+    "NDJSON: one JSON object per line; empty/whitespace lines skipped; non-string values abort; key order preserved per line; union header in first-seen order",
+    "filter stage: column missing drops record with first-occurrence stderr 'flowctl: filter: missing column <name>'; strict aborts",
+    "filter stage: <,<=,>,>= require finite float64 parse of both sides; non-numeric record dropped with 'flowctl: filter: drop non-numeric row <n>' (1-based input index); strict aborts",
+    "filter ==/!= compare as strings; unsupported predicate drops record"
+   ],
+   "affected_prior": [],
+   "summary": "Stand up the flowctl CLI end to end: parse a YAML pipeline, read CSV/NDJSON input, apply ordered filter/project/sort/limit stages, and emit JSONL output with strict run summary semantics."
+  },
+  "instruction_head": "# Build the first cut of `flowctl`\n\nStand up the `flowctl` CLI so a pipeline described in YAML actually runs end\nto end: read a structured file, reshape each record through an ordered list\nof stages, and write the surviving records to an output sink. The project\nskeleton in `/app/` already has the module path, a README, and a couple of\nsmoke fixtures \u2014 everything else you add.\n\n## Build & invocation\n\n- The binary must be produced by `go build -o /app/flowctl ./cmd/flowctl` from\n  inside `/app/`."
+ },
+ {
+  "round": 2,
+  "root": "/app",
+  "graph": {
+   "n_files": 7,
+   "n_edges": 13,
+   "delta": {
+    "files_added": [
+     "cmd/flowctl/main.go",
+     "internal/config/config.go",
+     "internal/input/input.go",
+     "internal/output/output.go",
+     "internal/pipeline/pipeline.go",
+     "internal/record/record.go",
+     "internal/stage/stage.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "cmd/flowctl/main.go",
+      "internal/config/config.go"
+     ],
+     [
+      "cmd/flowctl/main.go",
+      "internal/pipeline/pipeline.go"
+     ],
+     [
+      "internal/config/config.go",
+      "internal/stage/stage.go"
+     ],
+     [
+      "internal/input/input.go",
+      "internal/config/config.go"
+     ],
+     [
+      "internal/input/input.go",
+      "internal/record/record.go"
+     ],
+     [
+      "internal/output/output.go",
+      "internal/config/config.go"
+     ],
+     [
+      "internal/output/output.go",
+      "internal/record/record.go"
+     ],
+     [
+      "internal/pipeline/pipeline.go",
+      "internal/config/config.go"
+     ],
+     [
+      "internal/pipeline/pipeline.go",
+      "internal/input/input.go"
+     ],
+     [
+      "internal/pipeline/pipeline.go",
+      "internal/output/output.go"
+     ],
+     [
+      "internal/pipeline/pipeline.go",
+      "internal/stage/stage.go"
+     ],
+     [
+      "internal/stage/stage.go",
+      "internal/config/config.go"
+     ],
+     [
+      "internal/stage/stage.go",
+      "internal/record/record.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/stage/stage.go",
+     "pagerank": 0.28044,
+     "fan_in": 2,
+     "fan_out": 2
+    },
+    {
+     "file": "internal/config/config.go",
+     "pagerank": 0.255979,
+     "fan_in": 5,
+     "fan_out": 1
+    },
+    {
+     "file": "internal/record/record.go",
+     "pagerank": 0.220864,
+     "fan_in": 3,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/pipeline/pipeline.go",
+     "pagerank": 0.068753,
+     "fan_in": 1,
+     "fan_out": 4
+    },
+    {
+     "file": "internal/input/input.go",
+     "pagerank": 0.062858,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "internal/output/output.go",
+     "pagerank": 0.062858,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/flowctl/main.go",
+     "pagerank": 0.048248,
+     "fan_in": 0,
+     "fan_out": 2
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "internal/config/config.go",
+    "internal/input/input.go",
+    "internal/stage/stage.go",
+    "internal/pipeline/pipeline.go"
+   ],
+   "target_symbols": [
+    "InputConfig",
+    "StageConfig",
+    "AggregateConfig",
+    "Load",
+    "Read",
+    "readSQLite",
+    "Build",
+    "Apply",
+    "buildGroup",
+    "Run"
+   ],
+   "behavior_constraints": [
+    "Accept input.format=sqlite; resolve input.path relative to the config file directory and require a non-empty input.query or abort with flowctl: config: ...",
+    "Execute the SQLite query exactly as written without rewriting it, and produce records whose column order matches the SELECT result-set column order.",
+    "Abort with a single stderr line starting flowctl: input: ... and non-zero exit if the SQLite file is missing/unreadable or the query execution fails.",
+    "Convert SQLite values to strings: TEXT as-is, INTEGER as decimal with no leading zeros/no thousands separators and leading - for negatives, REAL as integer-valued without trailing .0 otherwise Go %g, NULL as empty string, and BLOB as a hard flowctl: input: ... error.",
+    "Count SQLite result rows toward processed in the summary exactly like CSV/NDJSON records.",
+    "Validate group config: by is an ordered non-empty list; aggregates is non-empty; each aggregate has a required non-empty unique as, op in {count,sum,min,max,avg}, and column required for every op except count; invalid config aborts with flowctl: config: ...",
+    "For each input record, compute the group key from the values of the by columns in order; a record missing any by column aborts with flowctl: group: ...",
+    "For sum/min/max/avg, parse record[column] as a finite decimal number; a non-numeric value aborts with flowctl: group: non-numeric value in column <col> at row <n>, where n is the 1-based input-source record number.",
+    "Group is a full barrier: consume all incoming records before emitting any output rows; emit groups in first-seen order.",
+    "Emit exactly len(by)+len(aggregates) columns per group output record, ordered by[0], by[1], ..., aggregates[0].as, aggregates[1].as, ...; drop all other incoming columns."
+   ],
+   "affected_prior": [
+    "Read input dispatch and CSV/NDJSON readers must remain unchanged while adding sqlite support",
+    "Build/Apply stage dispatch and existing filter/project/sort/limit stages must remain unchanged while adding group support",
+    "Run pipeline record numbering, stage execution order, and summary counting must remain stable when a group barrier is inserted",
+    "InputConfig/StageConfig config parsing and validation must accept new sqlite/group fields without altering existing configs"
+   ],
+   "summary": "This round adds a SQLite input source and a group aggregation stage while preserving all existing CLI, input, stage, and summary behavior."
+  },
+  "instruction_head": "# Add a SQLite input source and a grouping stage\n\nGrow `flowctl` so the pipeline can pull records out of a SQLite database and\ncollapse many input rows into aggregated summary rows. Keep every existing behavior exactly as it is; this change only adds\nfeatures. Nothing in the CLI invocation changes.\n\n## New input format: `sqlite`\n\n```yaml\ninput:\n  path: orders.db\n  format: sqlite\n  query: \"SELECT order_id, customer, amount, status FROM orders ORDER BY order_id\"\n```\n\n- `path` is a path to a SQLite"
+ },
+ {
+  "round": 3,
+  "root": "/app",
+  "graph": {
+   "n_files": 9,
+   "n_edges": 25,
+   "delta": {
+    "files_added": [
+     "internal/input/sqlite.go",
+     "internal/stage/group.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "internal/config/config.go",
+      "internal/stage/group.go"
+     ],
+     [
+      "internal/input/input.go",
+      "internal/input/sqlite.go"
+     ],
+     [
+      "internal/input/sqlite.go",
+      "internal/config/config.go"
+     ],
+     [
+      "internal/input/sqlite.go",
+      "internal/record/record.go"
+     ],
+     [
+      "internal/input/sqlite.go",
+      "internal/stage/group.go"
+     ],
+     [
+      "internal/pipeline/pipeline.go",
+      "internal/input/sqlite.go"
+     ],
+     [
+      "internal/pipeline/pipeline.go",
+      "internal/stage/group.go"
+     ],
+     [
+      "internal/stage/group.go",
+      "internal/config/config.go"
+     ],
+     [
+      "internal/stage/group.go",
+      "internal/input/sqlite.go"
+     ],
+     [
+      "internal/stage/group.go",
+      "internal/record/record.go"
+     ],
+     [
+      "internal/stage/group.go",
+      "internal/stage/stage.go"
+     ],
+     [
+      "internal/stage/stage.go",
+      "internal/stage/group.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/config/config.go",
+     "pagerank": 0.199397,
+     "fan_in": 7,
+     "fan_out": 2
+    },
+    {
+     "file": "internal/stage/group.go",
+     "pagerank": 0.199064,
+     "fan_in": 4,
+     "fan_out": 4
+    },
+    {
+     "file": "internal/record/record.go",
+     "pagerank": 0.178388,
+     "fan_in": 5,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/stage/stage.go",
+     "pagerank": 0.167325,
+     "fan_in": 3,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/input/sqlite.go",
+     "pagerank": 0.093994,
+     "fan_in": 3,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/pipeline/pipeline.go",
+     "pagerank": 0.047758,
+     "fan_in": 1,
+     "fan_out": 6
+    },
+    {
+     "file": "internal/input/input.go",
+     "pagerank": 0.04028,
+     "fan_in": 1,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/output/output.go",
+     "pagerank": 0.04028,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/flowctl/main.go",
+     "pagerank": 0.033514,
+     "fan_in": 0,
+     "fan_out": 2
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "internal/config/config.go",
+    "internal/stage/stage.go",
+    "internal/stage/join.go",
+    "internal/record/record.go",
+    "internal/input/input.go"
+   ],
+   "target_symbols": [
+    "JoinConfig",
+    "buildJoin",
+    "Apply",
+    "Build",
+    "Read",
+    "InputConfig",
+    "Set",
+    "Copy"
+   ],
+   "behavior_constraints": [
+    "kind must be 'inner' or 'left'; any other value is a config error prefixed 'flowctl: config: ...'",
+    "on must be a non-empty ordered list of column names present on both left and right records",
+    "right.input has the same shape as top-level input (path+format required, optional query for sqlite) and path resolves relative to the pipeline config file directory",
+    "right.select optional; when present projects each right record to exactly those columns in listed order, missing columns become ''",
+    "right.select omitted: right schema is the first right record's column order (CSV header order, NDJSON first-line key order, SQLite SELECT column order)",
+    "right.prefix default '' is prefixed to every non-on right column name added to the left record",
+    "Right side is loaded exactly once at the start of the join stage",
+    "Right-source I/O/parse/decode errors are emitted as a single stderr line starting with 'flowctl: input: ' and process exits non-zero",
+    "SQLite BLOB on the right side is a hard error with 'flowctl: input: ' prefix",
+    "Match is exact string equality of on-column values; no numeric coercion, trimming, or case folding"
+   ],
+   "affected_prior": [
+    "internal/stage/stage.go (Build/Apply stage dispatch needs new 'join' case)",
+    "internal/input/input.go (Read reused to load right.input)",
+    "internal/config/config.go (StageConfig/parsing must recognize join block)",
+    "internal/pipeline/pipeline.go (per-input row numbering must survive join row expansion)",
+    "internal/record/record.go (Set/Copy used to splice right fields onto left record)"
+   ],
+   "summary": "Add a new 'join' stage that loads a second data source once, matches records by string equality on required 'on' columns (with empty-string exclusion), and splices selected/prefixed non-on right columns onto left records under inner/left semantics while preserving all existing input, stage, summary, and row-numbering behavior."
+  },
+  "instruction_head": "# Add a `join` stage so pipelines can enrich records from a second source\n\nGrow `flowctl` so that a pipeline can pull rows from a **second** data source\nand splice fields from those rows onto the records flowing through the\npipeline. All existing behavior stays as-is; this change only adds a\nnew stage type called `join`.\n\n## New stage: `join`\n\n```yaml\n- type: join\n  kind: left            # or \"inner\"\n  on: [customer]         # one or more columns\n  right:\n    input:\n      path: customers.csv\n   "
+ },
+ {
+  "round": 4,
+  "root": "/app",
+  "graph": {
+   "n_files": 10,
+   "n_edges": 33,
+   "delta": {
+    "files_added": [
+     "internal/stage/join.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "internal/pipeline/pipeline.go",
+      "internal/stage/join.go"
+     ],
+     [
+      "internal/stage/join.go",
+      "internal/config/config.go"
+     ],
+     [
+      "internal/stage/join.go",
+      "internal/input/input.go"
+     ],
+     [
+      "internal/stage/join.go",
+      "internal/input/sqlite.go"
+     ],
+     [
+      "internal/stage/join.go",
+      "internal/record/record.go"
+     ],
+     [
+      "internal/stage/join.go",
+      "internal/stage/group.go"
+     ],
+     [
+      "internal/stage/join.go",
+      "internal/stage/stage.go"
+     ],
+     [
+      "internal/stage/stage.go",
+      "internal/stage/join.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/config/config.go",
+     "pagerank": 0.18234,
+     "fan_in": 8,
+     "fan_out": 2
+    },
+    {
+     "file": "internal/stage/group.go",
+     "pagerank": 0.181982,
+     "fan_in": 5,
+     "fan_out": 4
+    },
+    {
+     "file": "internal/record/record.go",
+     "pagerank": 0.164982,
+     "fan_in": 6,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/stage/stage.go",
+     "pagerank": 0.159846,
+     "fan_in": 4,
+     "fan_out": 4
+    },
+    {
+     "file": "internal/input/sqlite.go",
+     "pagerank": 0.094728,
+     "fan_in": 4,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/stage/join.go",
+     "pagerank": 0.068013,
+     "fan_in": 2,
+     "fan_out": 6
+    },
+    {
+     "file": "internal/input/input.go",
+     "pagerank": 0.043681,
+     "fan_in": 2,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/pipeline/pipeline.go",
+     "pagerank": 0.041359,
+     "fan_in": 1,
+     "fan_out": 7
+    },
+    {
+     "file": "internal/output/output.go",
+     "pagerank": 0.034046,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/flowctl/main.go",
+     "pagerank": 0.029024,
+     "fan_in": 0,
+     "fan_out": 2
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "internal/config/config.go",
+    "internal/stage/stage.go",
+    "internal/stage/dedup.go"
+   ],
+   "target_symbols": [
+    "DedupConfig",
+    "buildDedup",
+    "buildSort",
+    "Build",
+    "StageConfig",
+    "compareFloats"
+   ],
+   "behavior_constraints": [
+    "A `dedup` stage type must be accepted by config loading and stage building.",
+    "`by` is a required non-empty list; empty or missing `by` is a config error prefixed `flowctl: config: dedup: ...`.",
+    "`keep` defaults to `first` and must be one of `first`, `last`, `min`, `max`, or `unique`; any other value is a config error.",
+    "`on` is required for `keep: min`/`max`, must be absent for `first`/`last`/`unique`, and is a single column name; violations are config errors.",
+    "`fallback` is only valid for `min`/`max`, defaults to `first`, must be `first` or `last`, and is a config error when provided for other keep modes or set to an invalid value.",
+    "Groups are formed by plain string equality on all `by` columns; empty-string values participate in grouping, but a missing `by` column is a hard runtime error prefixed `flowctl: dedup: `.",
+    "`keep: first` emits the first record per group in the order first records were seen; `keep: last` emits the last record per group in the relative ingest order of those last records.",
+    "`keep: unique` emits only records whose group has exactly one member, in original ingest order; groups with two or more members are dropped entirely.",
+    "For `keep: min`/`max`, survivors are emitted in the order of their ingest positions.",
+    "For `keep: min`/`max`, a missing or empty-string `on` value is a sentinel below all finite numbers; a present non-empty non-numeric `on` value is a hard runtime error prefixed `flowctl: dedup: `."
+   ],
+   "affected_prior": [
+    "sort stage in internal/stage/stage.go, especially buildSort/compareFloats missing numeric key handling",
+    "stage Build dispatch and StageConfig parsing for stage types"
+   ],
+   "summary": "Add a `dedup` stage with by/keep/on/fallback/when semantics and change `sort` so missing or empty numeric sort keys sort as a below-all sentinel instead of aborting."
+  },
+  "instruction_head": "# Add a `dedup` stage, and correct the missing-key behaviour of `sort`\n\nAdd a `dedup` stage, and fix the existing `sort` behavior for missing\nnumeric keys. All other behavior remains unchanged.\n\n## Correction to `sort` \u2014 missing key columns no longer abort\n\n### Previous behavior\n\nThe previous rule was: *\"A missing key column in a record is treated\nas the empty string for `string` comparisons, and as a hard error for\n`number` comparisons.\"*\n\n### New behavior\n\n- `string`-typed key: unchanged \u2014 a m"
+ },
+ {
+  "round": 5,
+  "root": "/app",
+  "graph": {
+   "n_files": 11,
+   "n_edges": 39,
+   "delta": {
+    "files_added": [
+     "internal/stage/dedup.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "internal/pipeline/pipeline.go",
+      "internal/stage/dedup.go"
+     ],
+     [
+      "internal/stage/dedup.go",
+      "internal/config/config.go"
+     ],
+     [
+      "internal/stage/dedup.go",
+      "internal/record/record.go"
+     ],
+     [
+      "internal/stage/dedup.go",
+      "internal/stage/group.go"
+     ],
+     [
+      "internal/stage/dedup.go",
+      "internal/stage/stage.go"
+     ],
+     [
+      "internal/stage/stage.go",
+      "internal/stage/dedup.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/stage/group.go",
+     "pagerank": 0.175619,
+     "fan_in": 6,
+     "fan_out": 4
+    },
+    {
+     "file": "internal/config/config.go",
+     "pagerank": 0.173587,
+     "fan_in": 9,
+     "fan_out": 2
+    },
+    {
+     "file": "internal/stage/stage.go",
+     "pagerank": 0.161175,
+     "fan_in": 5,
+     "fan_out": 5
+    },
+    {
+     "file": "internal/record/record.go",
+     "pagerank": 0.15866,
+     "fan_in": 7,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/input/sqlite.go",
+     "pagerank": 0.085987,
+     "fan_in": 4,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/stage/dedup.go",
+     "pagerank": 0.057217,
+     "fan_in": 2,
+     "fan_out": 4
+    },
+    {
+     "file": "internal/stage/join.go",
+     "pagerank": 0.057217,
+     "fan_in": 2,
+     "fan_out": 6
+    },
+    {
+     "file": "internal/input/input.go",
+     "pagerank": 0.037923,
+     "fan_in": 2,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/pipeline/pipeline.go",
+     "pagerank": 0.036902,
+     "fan_in": 1,
+     "fan_out": 8
+    },
+    {
+     "file": "internal/output/output.go",
+     "pagerank": 0.029817,
+     "fan_in": 1,
+     "fan_out": 2
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "internal/stage/rank.go",
+    "internal/config/config.go",
+    "internal/stage/stage.go"
+   ],
+   "target_symbols": [
+    "RankConfig",
+    "RankKeyConfig",
+    "RankBoundsConfig",
+    "buildRank",
+    "Apply",
+    "Build",
+    "StageConfig"
+   ],
+   "behavior_constraints": [
+    "A rank stage is recognized by config and stage.Build; invalid rank config produces stderr lines starting with flowctl: config: rank: and aborts.",
+    "partition_by defaults to empty; records group by exact string values of all partition_by columns; empty string does not suppress grouping; a participating record missing a partition_by column aborts with flowctl: rank: .",
+    "order_by is required and non-empty; each key requires column, as string|number, order asc|desc, and null_position first|last; bad null_position is config error flowctl: config: rank: null_position must be first or last.",
+    "For rank only, sentinel-equivalent values are placed first or last per null_position regardless of order; non-sentinel values compare by order; non-parseable present numeric values abort with flowctl: rank: .",
+    "method defaults to dense; dense has no gaps, rank skips ties, row gives distinct consecutive integers broken by ingest order, percent emits percent-rank strings.",
+    "percent computes rank-style integer ranks starting at 1, then p_i=(r_i-1)/max(1,n_part-1) formatted as exactly 6 decimal digits with banker's rounding, leading 0 in [0,1), no exponent, no plus, no trimming; single participating record yields 0.000000; start is rejected for percent.",
+    "into is required and must name a new column not already present on any participating input record; presence of the key aborts with flowctl: rank: even if empty; non-participating records pass through without into.",
+    "start defaults to 1, must be a non-negative integer literal, and sets the rank of the first distinct order_by tuple per partition.",
+    "skip_nulls defaults false; when true records whose entire order_by tuple is all-sentinel do not participate, are emitted unchanged at original ingest positions, do not affect counters/tie counts or into checks, and may lack partition_by columns without aborting.",
+    "reset_on optionally resets the rank counter within each partition's sorted order on value change; each run ranks independently from start; peer counts remain partition-wide; reset_on is rejected with percent, with into, with emit_peers, and when empty; missing reset_on values group as empty string."
+   ],
+   "affected_prior": [
+    "StageConfig parsing in internal/config/config.go must accept the new rank stage",
+    "stage.Build dispatch in internal/stage/stage.go must route rank to buildRank",
+    "existing sort/dedup sentinel and group-key conventions are relied on by rank but must remain unchanged"
+   ],
+   "summary": "Add a rank stage that assigns dense/rank/row/percent ranks within partition_by groups using ordered keys with null_position, skip_nulls, reset_on, bounds, and into-column semantics, without changing existing behavior."
+  },
+  "instruction_head": "# Add a `rank` stage for per-group ordered row-numbering\n\nAdd a `rank` stage for ordered row-numbering within each group. All\nexisting behavior remains unchanged.\n\n## New stage: `rank`\n\n```yaml\n- type: rank\n  partition_by: [region, customer]   # optional; defaults to []\n  order_by:                          # required, non-empty\n    - column: amount\n      as: number\n      order: desc\n      null_position: last            # required per key (first|last)\n    - column: order_id\n      as: string\n     "
+ },
+ {
+  "round": 6,
+  "root": "/app",
+  "graph": {
+   "n_files": 11,
+   "n_edges": 39,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/stage/group.go",
+     "pagerank": 0.175619,
+     "fan_in": 6,
+     "fan_out": 4
+    },
+    {
+     "file": "internal/config/config.go",
+     "pagerank": 0.173587,
+     "fan_in": 9,
+     "fan_out": 2
+    },
+    {
+     "file": "internal/stage/stage.go",
+     "pagerank": 0.161175,
+     "fan_in": 5,
+     "fan_out": 5
+    },
+    {
+     "file": "internal/record/record.go",
+     "pagerank": 0.15866,
+     "fan_in": 7,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/input/sqlite.go",
+     "pagerank": 0.085987,
+     "fan_in": 4,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/stage/dedup.go",
+     "pagerank": 0.057217,
+     "fan_in": 2,
+     "fan_out": 4
+    },
+    {
+     "file": "internal/stage/join.go",
+     "pagerank": 0.057217,
+     "fan_in": 2,
+     "fan_out": 6
+    },
+    {
+     "file": "internal/input/input.go",
+     "pagerank": 0.037923,
+     "fan_in": 2,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/pipeline/pipeline.go",
+     "pagerank": 0.036902,
+     "fan_in": 1,
+     "fan_out": 8
+    },
+    {
+     "file": "internal/output/output.go",
+     "pagerank": 0.029817,
+     "fan_in": 1,
+     "fan_out": 2
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "internal/stage/pivot.go",
+    "internal/stage/group.go",
+    "internal/stage/stage.go",
+    "internal/config/config.go"
+   ],
+   "target_symbols": [
+    "PivotConfig",
+    "buildPivot",
+    "Apply",
+    "Build",
+    "buildGroup",
+    "groupKey"
+   ],
+   "behavior_constraints": [
+    "A record missing a `group.by` column is no longer a hard error; the missing value is treated as empty string \"\" for forming the group key tuple (group never aborts on missing by columns).",
+    "A record missing the `column` referenced by a numeric group aggregate (sum/min/max/avg) contributes no value to that aggregate but is still counted by count.",
+    "If every record in a group lacks the numeric aggregate column, the rendered aggregate value is empty string \"\" (overrides sum-of-empty=0 only when all contributing records lacked the column).",
+    "A present-but-non-numeric value under a numeric group op still aborts with `flowctl: group: non-numeric value in column <col> at row <n>`.",
+    "pivot.index is required and non-empty; empty/missing is a config error: `flowctl: config: pivot: index must be a non-empty list`.",
+    "pivot.columns and pivot.values are required single-column names; empty/missing is a config error.",
+    "pivot.as must be `string` or `number`; `as:string` forbids sum/min/max/avg with `flowctl: config: pivot: agg <x> requires as: number`; `as:number` forbids first/last with `flowctl: config: pivot: agg <x> requires as: string`.",
+    "pivot.agg is one of sum|min|max|avg|count|first|last; any other value is a config error.",
+    "Under pivot.as:number, a non-parseable present value is a hard error: `flowctl: pivot: non-numeric value in column <col> at row <n>`; missing or empty-string values contribute nothing to numeric aggregates but still count for `count`.",
+    "pivot.agg=count renders a plain decimal integer string with no leading zeros/sign and is allowed under both as:string and as:number."
+   ],
+   "affected_prior": [
+    "group stage (round 2): missing `by` columns handling relaxed from hard error to empty-string grouping",
+    "group stage (round 2): numeric aggregate contribution rule for records missing the aggregate column"
+   ],
+   "summary": "Add a new `pivot` stage (index/columns/values/as/agg/fill/sort_columns/column_prefix/strict_schema/drop_empty/on_conflict) and relax `group` so missing `by` columns are treated as empty strings instead of aborting."
+  },
+  "instruction_head": "# Add a `pivot` stage, and relax `group`'s missing-`by` rule\n\nAdd a `pivot` stage, and relax the existing `group` handling for\nmissing `by` columns. All other behavior remains unchanged.\n\n## Relaxation to `group` \u2014 missing `by` columns are no longer a hard error\n\n### Previous behavior\n\nPreviously: *\"A record missing one of the `by` columns is a hard\nerror (abort the run with `flowctl: group: ...`).\"*\n\n### New behavior\n\n- A record that lacks a `by` column is **no longer a hard error**. The\n  miss"
+ },
+ {
+  "round": 7,
+  "root": "/app",
+  "graph": {
+   "n_files": 12,
+   "n_edges": 46,
+   "delta": {
+    "files_added": [
+     "internal/stage/pivot.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "internal/pipeline/pipeline.go",
+      "internal/stage/pivot.go"
+     ],
+     [
+      "internal/stage/pivot.go",
+      "internal/config/config.go"
+     ],
+     [
+      "internal/stage/pivot.go",
+      "internal/input/sqlite.go"
+     ],
+     [
+      "internal/stage/pivot.go",
+      "internal/record/record.go"
+     ],
+     [
+      "internal/stage/pivot.go",
+      "internal/stage/group.go"
+     ],
+     [
+      "internal/stage/pivot.go",
+      "internal/stage/stage.go"
+     ],
+     [
+      "internal/stage/stage.go",
+      "internal/stage/pivot.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/stage/group.go",
+     "pagerank": 0.170203,
+     "fan_in": 7,
+     "fan_out": 4
+    },
+    {
+     "file": "internal/config/config.go",
+     "pagerank": 0.166342,
+     "fan_in": 10,
+     "fan_out": 2
+    },
+    {
+     "file": "internal/stage/stage.go",
+     "pagerank": 0.159066,
+     "fan_in": 6,
+     "fan_out": 6
+    },
+    {
+     "file": "internal/record/record.go",
+     "pagerank": 0.153272,
+     "fan_in": 8,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/input/sqlite.go",
+     "pagerank": 0.087427,
+     "fan_in": 5,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/stage/dedup.go",
+     "pagerank": 0.049034,
+     "fan_in": 2,
+     "fan_out": 4
+    },
+    {
+     "file": "internal/stage/join.go",
+     "pagerank": 0.049034,
+     "fan_in": 2,
+     "fan_out": 6
+    },
+    {
+     "file": "internal/stage/pivot.go",
+     "pagerank": 0.049034,
+     "fan_in": 2,
+     "fan_out": 5
+    },
+    {
+     "file": "internal/input/input.go",
+     "pagerank": 0.033447,
+     "fan_in": 2,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/pipeline/pipeline.go",
+     "pagerank": 0.033283,
+     "fan_in": 1,
+     "fan_out": 9
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "internal/stage/unpivot.go",
+    "internal/stage/stage.go",
+    "internal/config/config.go"
+   ],
+   "target_symbols": [
+    "UnpivotConfig",
+    "buildUnpivot",
+    "Build",
+    "Apply",
+    "StageConfig"
+   ],
+   "behavior_constraints": [
+    "unpivot stage reshapes wide records to long form, emitting one row per measure per input record",
+    "id is a required non-empty ordered list; a record missing an id column is treated as empty string for that column (no abort); duplicate id names are a config error",
+    "exactly one of measures or measures_match must be supplied; both or neither is a config error",
+    "measures is a non-empty ordered list; duplicates are a config error; a name appearing in both id and measures is a config error",
+    "measures_match has optional prefix/suffix/regex selectors composed with AND; at least one selector required; empty-string selectors are config errors; candidate set is record keys minus id and exclude columns",
+    "invalid regex in measures_match is a config error",
+    "exclude is optional, only valid with measures_match; supplying exclude with measures is a config error",
+    "variable is required unless axes is supplied; must be non-empty and differ from every id column and from value; mutually exclusive with axes; supplying neither is a config error",
+    "axes is optional, mutually exclusive with variable; requires measures_match with non-empty regex; non-empty list of axis specs each with name and group",
+    "axis name must be non-empty, unique across axes, differ from id and value; unknown keys in axis spec are config errors"
+   ],
+   "affected_prior": [
+    "Build in internal/stage/stage.go (must dispatch new unpivot type)",
+    "StageConfig in internal/config/config.go (must carry unpivot configuration)"
+   ],
+   "summary": "Add an `unpivot` stage that reshapes wide records into long form with id/measures/measures_match/variable-or-axes/value selectors and drop_empty/on_missing/sort/value_type options, without changing existing behavior."
+  },
+  "instruction_head": "# Add an `unpivot` stage (wide-to-long reshape)\n\nAdd an `unpivot` stage for wide-to-long reshaping. All existing\nbehavior remains unchanged.\n\n## New stage: `unpivot`\n\n```yaml\n- type: unpivot\n  id: [region, customer]               # required, non-empty\n  measures: [q_Q1, q_Q2, q_Q3]         # mutually exclusive with measures_match\n  measures_match:                      # mutually exclusive with measures\n    prefix: q_                         # zero-or-more selectors below\n    suffix: _amt\n    reg"
+ },
+ {
+  "round": 8,
+  "root": "/app",
+  "graph": {
+   "n_files": 13,
+   "n_edges": 53,
+   "delta": {
+    "files_added": [
+     "internal/stage/unpivot.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "internal/pipeline/pipeline.go",
+      "internal/stage/unpivot.go"
+     ],
+     [
+      "internal/stage/stage.go",
+      "internal/stage/unpivot.go"
+     ],
+     [
+      "internal/stage/unpivot.go",
+      "internal/config/config.go"
+     ],
+     [
+      "internal/stage/unpivot.go",
+      "internal/input/sqlite.go"
+     ],
+     [
+      "internal/stage/unpivot.go",
+      "internal/record/record.go"
+     ],
+     [
+      "internal/stage/unpivot.go",
+      "internal/stage/group.go"
+     ],
+     [
+      "internal/stage/unpivot.go",
+      "internal/stage/stage.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/stage/group.go",
+     "pagerank": 0.166312,
+     "fan_in": 8,
+     "fan_out": 4
+    },
+    {
+     "file": "internal/config/config.go",
+     "pagerank": 0.160946,
+     "fan_in": 11,
+     "fan_out": 2
+    },
+    {
+     "file": "internal/stage/stage.go",
+     "pagerank": 0.157476,
+     "fan_in": 7,
+     "fan_out": 7
+    },
+    {
+     "file": "internal/record/record.go",
+     "pagerank": 0.149313,
+     "fan_in": 9,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/input/sqlite.go",
+     "pagerank": 0.088428,
+     "fan_in": 6,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/stage/dedup.go",
+     "pagerank": 0.043003,
+     "fan_in": 2,
+     "fan_out": 4
+    },
+    {
+     "file": "internal/stage/join.go",
+     "pagerank": 0.043003,
+     "fan_in": 2,
+     "fan_out": 6
+    },
+    {
+     "file": "internal/stage/pivot.go",
+     "pagerank": 0.043003,
+     "fan_in": 2,
+     "fan_out": 5
+    },
+    {
+     "file": "internal/stage/unpivot.go",
+     "pagerank": 0.043003,
+     "fan_in": 2,
+     "fan_out": 5
+    },
+    {
+     "file": "internal/pipeline/pipeline.go",
+     "pagerank": 0.030354,
+     "fan_in": 1,
+     "fan_out": 10
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "internal/stage/bucket.go",
+    "internal/stage/stage.go",
+    "internal/config/config.go"
+   ],
+   "target_symbols": [
+    "BucketConfig",
+    "buildBucket",
+    "Apply",
+    "buildSort",
+    "Build",
+    "BuildWithDir",
+    "StageConfig",
+    "compareFloats",
+    "parseFloat"
+   ],
+   "behavior_constraints": [
+    "For as: string sort keys, empty/missing values sort AFTER non-empty strings under order: asc and BEFORE non-empty strings under order: desc",
+    "Non-empty string sort keys compare via Go byte-level < / > unchanged",
+    "Stable sort order is preserved for ties on empty/missing state across all keys",
+    "Numeric sort path (as: number) and its hard-error on non-numeric values are unchanged",
+    "processed/emitted/dropped_nonnumeric/dropped_missing counters are unchanged by the sort correction",
+    "bucket requires non-empty column and non-empty into; into must differ from column (config error otherwise)",
+    "Runtime error when into column already present on an input record: 'flowctl: bucket: into column <name> already present at row <n>'",
+    "Exactly one of edges or width is required; supplying both or neither is a config error",
+    "edges must have at least two strictly-increasing finite numeric entries; non-finite or non-increasing entries are config errors",
+    "labels (optional) length must equal len(edges)-1; entries non-empty; no duplicates"
+   ],
+   "affected_prior": [
+    "buildSort in internal/stage/stage.go (round 4 numeric null-placement behavior)",
+    "StageConfig / Build / BuildWithDir dispatch in internal/stage/stage.go",
+    "compareFloats / parseFloat numeric helpers reused by bucket"
+   ],
+   "summary": "Add a numeric `bucket` stage (edges or width mode with labels, inclusive, under/over labels, on_missing/on_non_numeric handling) and correct `as: string` sort so empty/missing keys sort last under asc and first under desc."
+  },
+  "instruction_head": "# Add a `bucket` stage, and correct string-key null placement in `sort`\n\nAdd a `bucket` stage, and fix the existing `sort` behavior for\n`as: string` keys. All other behavior remains unchanged.\n\n## Correction to `sort` \u2014 empty/missing string keys now sort last under `asc`\n\n### Previous behavior\n\nFor an `as: string` sort key, a missing key column and an empty\nstring key both compared as the literal `\"\"`. Because `\"\"` is\nlexicographically less than every non-empty string, such records\nalways sorted"
+ },
+ {
+  "round": 9,
+  "root": "/app",
+  "graph": {
+   "n_files": 14,
+   "n_edges": 60,
+   "delta": {
+    "files_added": [
+     "internal/stage/bucket.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "internal/pipeline/pipeline.go",
+      "internal/stage/bucket.go"
+     ],
+     [
+      "internal/stage/bucket.go",
+      "internal/config/config.go"
+     ],
+     [
+      "internal/stage/bucket.go",
+      "internal/input/sqlite.go"
+     ],
+     [
+      "internal/stage/bucket.go",
+      "internal/record/record.go"
+     ],
+     [
+      "internal/stage/bucket.go",
+      "internal/stage/group.go"
+     ],
+     [
+      "internal/stage/bucket.go",
+      "internal/stage/stage.go"
+     ],
+     [
+      "internal/stage/stage.go",
+      "internal/stage/bucket.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "internal/stage/group.go",
+     "pagerank": 0.163376,
+     "fan_in": 9,
+     "fan_out": 4
+    },
+    {
+     "file": "internal/config/config.go",
+     "pagerank": 0.15675,
+     "fan_in": 12,
+     "fan_out": 2
+    },
+    {
+     "file": "internal/stage/stage.go",
+     "pagerank": 0.156231,
+     "fan_in": 8,
+     "fan_out": 8
+    },
+    {
+     "file": "internal/record/record.go",
+     "pagerank": 0.146265,
+     "fan_in": 10,
+     "fan_out": 0
+    },
+    {
+     "file": "internal/input/sqlite.go",
+     "pagerank": 0.089165,
+     "fan_in": 7,
+     "fan_out": 3
+    },
+    {
+     "file": "internal/stage/bucket.go",
+     "pagerank": 0.038352,
+     "fan_in": 2,
+     "fan_out": 5
+    },
+    {
+     "file": "internal/stage/dedup.go",
+     "pagerank": 0.038352,
+     "fan_in": 2,
+     "fan_out": 4
+    },
+    {
+     "file": "internal/stage/join.go",
+     "pagerank": 0.038352,
+     "fan_in": 2,
+     "fan_out": 6
+    },
+    {
+     "file": "internal/stage/pivot.go",
+     "pagerank": 0.038352,
+     "fan_in": 2,
+     "fan_out": 5
+    },
+    {
+     "file": "internal/stage/unpivot.go",
+     "pagerank": 0.038352,
+     "fan_in": 2,
+     "fan_out": 5
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "internal/stage/rank.go",
+    "internal/stage/window.go",
+    "internal/stage/stage.go",
+    "internal/config/config.go"
+   ],
+   "target_symbols": [
+    "WindowConfig",
+    "buildWindow",
+    "Apply",
+    "Build",
+    "StageConfig",
+    "RankConfig",
+    "rank percent computation"
+   ],
+   "behavior_constraints": [
+    "rank method:percent formula changes to (r_i - 1) / n_part with no max(1,...) clamp and denominator equal to partition size",
+    "single-record partition still emits \"0.000000\" for percent",
+    "6-digit fixed-width rendering (half-to-even banker's rounding, single leading 0, no exponent, no trimming) is unchanged",
+    "ties still share rank value so tied records share percent value",
+    "rank methods dense/rank/row are unchanged",
+    "window.time_column is required and non-empty (config error otherwise)",
+    "window.time_format required and must be unix_seconds|unix_millis|rfc3339",
+    "window.window must specify exactly one of tumble|slide|session",
+    "tumble requires positive size; origin optional default 0",
+    "slide requires positive size, positive step with step <= size; origin optional default 0"
+   ],
+   "affected_prior": [
+    "rank stage (round 5) \u2014 percent formula change is retroactive for any pipeline using method:percent"
+   ],
+   "summary": "Add a new time-based `window` aggregation stage with tumble/slide/session windows, partitioning, and many aggregates, and change the existing `rank` percent formula denominator from max(1, n_part-1) to n_part."
+  },
+  "instruction_head": "# Add a `window` stage, and change `rank`'s `percent` formula\n\nAdd a `window` stage for time-based aggregation, and change the\n`method: percent` formula used by the existing `rank` stage. All other\nbehavior remains unchanged.\n\n## Change to `rank` \u2014 `method: percent` now uses `(r_i - 1) / n_part`\n\n### Previous behavior\n\nUnder `method: percent`, the formula was\n`p_i = (r_i - 1) / max(1, n_part - 1)` where `r_i` is the `rank`-style\ninteger rank and `n_part` is the partition size. A single-record\npa"
+ }
+]

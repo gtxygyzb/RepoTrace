@@ -1,0 +1,111 @@
+{
+ "round": 3,
+ "root": "/app",
+ "graph": {
+  "n_files": 10,
+  "n_edges": 24,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "internal/mlck/checkpoint.go",
+    "pagerank": 0.272082,
+    "fan_in": 7,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/compare/compare.go",
+    "pagerank": 0.130696,
+    "fan_in": 4,
+    "fan_out": 3
+   },
+   {
+    "file": "internal/drift/drift.go",
+    "pagerank": 0.122313,
+    "fan_in": 3,
+    "fan_out": 3
+   },
+   {
+    "file": "internal/merge/merge.go",
+    "pagerank": 0.122313,
+    "fan_in": 3,
+    "fan_out": 3
+   },
+   {
+    "file": "internal/app/app.go",
+    "pagerank": 0.102943,
+    "fan_in": 2,
+    "fan_out": 7
+   },
+   {
+    "file": "internal/lineage/lineage.go",
+    "pagerank": 0.061385,
+    "fan_in": 2,
+    "fan_out": 1
+   },
+   {
+    "file": "internal/manifest/manifest.go",
+    "pagerank": 0.061385,
+    "fan_in": 2,
+    "fan_out": 1
+   },
+   {
+    "file": "internal/report/report.go",
+    "pagerank": 0.050627,
+    "fan_in": 1,
+    "fan_out": 4
+   },
+   {
+    "file": "cmd/repro-verify/main.go",
+    "pagerank": 0.038127,
+    "fan_in": 0,
+    "fan_out": 1
+   },
+   {
+    "file": "main.go",
+    "pagerank": 0.038127,
+    "fan_in": 0,
+    "fan_out": 1
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "internal/report/report.go",
+   "internal/drift/drift.go",
+   "internal/app/app.go"
+  ],
+  "target_symbols": [
+   "Generate",
+   "quickLineageCheck",
+   "Analyze",
+   "runGenerateReport",
+   "runDriftAnalysis",
+   "Compare",
+   "Audit"
+  ],
+  "behavior_constraints": [
+   "generate-report's comparison section must fail (match=false) when either checkpoint has tensors the other lacks, mirroring compare-outputs' missing_in_file1/missing_in_file2 handling",
+   "generate-report's comparison summary must include a count of missing tensors (e.g. '2/3 tensors differ, 1 tensors missing')",
+   "drift-analysis output 'tensors' list must be sorted alphabetically by tensor name",
+   "drift-analysis output 'skipped_tensors' list must be sorted alphabetically by tensor name",
+   "generate-report's lineage section must use the same validation logic as audit-lineage, producing an 'errors' array with identical error strings to audit-lineage",
+   "generate-report lineage output on failure must be {\"valid\": false, \"errors\": [...]} rather than just {\"valid\": false}",
+   "drift-analysis and generate-report outputs must be reproducible across runs given identical inputs"
+  ],
+  "affected_prior": [
+   "Generate (internal/report/report.go) - comparison and lineage sections from round 1",
+   "quickLineageCheck (internal/report/report.go) - simplified lineage check to be removed/replaced",
+   "Analyze (internal/drift/drift.go) - non-deterministic map iteration from round 1",
+   "runGenerateReport (internal/app/app.go) - report handler from rounds 1-2",
+   "runDriftAnalysis (internal/app/app.go) - drift handler from rounds 1-2"
+  ],
+  "summary": "This round fixes generate-report to fail on missing tensors in its comparison, sorts drift-analysis tensor lists alphabetically, and replaces the simplified quickLineageCheck with full audit-lineage validation so reports include detailed errors."
+ },
+ "instruction_head": "The comparison section in `generate-report` silently ignores tensor name mismatches between checkpoint files. If one file has extra tensors the other doesn't, the report still says `\"match\": true` as long as the shared tensors agree. That's wrong \u2014 `compare-outputs` correctly handles this by tracking `missing_in_file1` and `missing_in_file2`. Fix `generate-report` to match: any missing tensor should make the comparison fail, and the summary should mention it (e.g. `\"2/3 tensors differ, 1 tensors"
+}

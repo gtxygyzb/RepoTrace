@@ -1,0 +1,64 @@
+{
+ "round": 7,
+ "root": "/app",
+ "graph": {
+  "n_files": 1,
+  "n_edges": 0,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "pipeline.sh",
+    "pagerank": 1.0,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "pipeline.sh"
+  ],
+  "target_symbols": [
+   "scale",
+   "scale_set",
+   "scale_get",
+   "scale_list",
+   "scale_all",
+   "scale_set_bounds",
+   "scale_get_bounds",
+   "deploy",
+   "rollback",
+   "promote",
+   "status",
+   "history"
+  ],
+  "behavior_constraints": [
+   "scale <env> <service> <count> sets replicas; validates in order: env exists \u2192 service exists \u2192 valid positive integer \u2192 deployed \u2192 env max_replicas \u2192 service bounds; prints SCALED <env>/<service> to <count> replicas (was <previous>)",
+   "scale <env> <service> <count> errors: unknown environment '<env>', unknown service '<service>', invalid replica count '<count>', <service> is not deployed to <env>, <count> exceeds max_replicas (<max>) for <env>, <count> violates bounds [<min>..<max>] for <service> in <env>",
+   "scale <env> <service> (no count) prints '<service>: <count> replicas' with default 1 for deployed-but-never-scaled services; errors '<service> is not deployed to <env>' if not deployed",
+   "scale <env> lists all deployed services alphabetically as '<service>: <count> replicas'; prints nothing if none deployed; errors 'unknown environment <env>' if env missing",
+   "scale <env> --all <count> validates all deployed services first; reports first alphabetical bounds violation as 'ERROR: <count> violates bounds [<min>..<max>] for <service> in <env>'; on success prints SCALED line per service alphabetically then 'Scaled <N> services to <count> replicas'; writes SCALE event per service; errors 'ERROR: no services deployed in <env>' if none; lock-enforced",
+   "scale <env> <service> --bounds <min> <max> requires min>=1, max>=min, max<=env max_replicas; prints 'BOUNDS <env>/<service> set to [<min>..<max>]'; auto-adjusts current replicas outside new bounds and prints 'SCALED <env>/<service> to <adjusted> replicas (was <previous>)' plus SCALE event; errors 'invalid bounds: min must be >= 1', 'invalid bounds: max must be >= min', 'invalid bounds: max (<max>) exceeds max_replicas (<env_max>) for <env>'; lock-enforced",
+   "scale <env> <service> --bounds (read) prints '<service>: bounds [<min>..<max>]' or '<service>: no bounds set'; service must be deployed",
+   "write operations (scale set, --all, --bounds set) are blocked on locked environments; read operations (list, get, get-bounds) work on locked environments",
+   "each SCALE event is JSON: {timestamp, iso_timestamp, action:'SCALE', service, version:'-', replicas, previous}; history displays '<iso_timestamp> SCALE <service> from <previous> to <count> replicas'",
+   "status <env> detail line shows '<service>: <version> (deployed at <timestamp>) [<count> replicas]' with default 1 for never-scaled services"
+  ],
+  "affected_prior": [
+   "deploy",
+   "rollback",
+   "promote",
+   "status",
+   "history",
+   "lock"
+  ],
+  "summary": "Add a scale command (set/get/list/all/bounds) with persistent replica and bounds state, SCALE event logging, status integration showing replica counts, and deploy/rollback/promote interactions that reset replicas to 1 while preserving bounds."
+ },
+ "instruction_head": "Add service replica scaling to the pipeline orchestrator. Replicas represent the number of instances running for each service in each environment.\n\n**`pipeline.sh scale <environment> <service> <count>`** \u2014 Set the replica count for a service in an environment. Count must be a positive integer (>= 1). Output: `SCALED <env>/<service> to <count> replicas (was <previous>)`. Error if count exceeds the environment's `max_replicas` from the manifest: `ERROR: <count> exceeds max_replicas (<max>) for <en"
+}

@@ -1,0 +1,110 @@
+{
+ "round": 6,
+ "root": "/app",
+ "graph": {
+  "n_files": 7,
+  "n_edges": 7,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "cmd/flowr/parse.go",
+    "pagerank": 0.259066,
+    "fan_in": 2,
+    "fan_out": 0
+   },
+   {
+    "file": "cmd/flowr/util.go",
+    "pagerank": 0.16695,
+    "fan_in": 2,
+    "fan_out": 0
+   },
+   {
+    "file": "cmd/flowr/validate.go",
+    "pagerank": 0.16695,
+    "fan_in": 2,
+    "fan_out": 1
+   },
+   {
+    "file": "cmd/flowr/interpolate.go",
+    "pagerank": 0.117158,
+    "fan_in": 1,
+    "fan_out": 2
+   },
+   {
+    "file": "cmd/flowr/expand.go",
+    "pagerank": 0.096625,
+    "fan_in": 0,
+    "fan_out": 4
+   },
+   {
+    "file": "cmd/flowr/main.go",
+    "pagerank": 0.096625,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "cmd/flowr/types.go",
+    "pagerank": 0.096625,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "cmd/flowr/types.go",
+   "cmd/flowr/parse.go",
+   "cmd/flowr/validate.go",
+   "cmd/flowr/expand.go",
+   "cmd/flowr/interpolate.go",
+   "cmd/flowr/main.go"
+  ],
+  "target_symbols": [
+   "parseLocks",
+   "parseStepLock",
+   "parseStepLocks",
+   "validateLocks",
+   "validateStepLock",
+   "validateStepLocks",
+   "LockSpec",
+   "LockAcquisition",
+   "acquireLocks",
+   "releaseLocks",
+   "deadlockDetect",
+   "validateWorkflow",
+   "validateStep",
+   "parseStep",
+   "main"
+  ],
+  "behavior_constraints": [
+   "Top-level optional `locks:` block maps lock name to spec with keys `mode` (exclusive|shared, required) and optional `capacity` (>=1, shared-only, default 1).",
+   "Lock names must match ^[A-Za-z_][A-Za-z0-9_]*$; violations exit 4 with `invalid lock name: <NAME>`.",
+   "Unknown lock spec keys exit 4 with `unknown lock spec key: <KEY>`; invalid mode exits 4 with `invalid lock mode: <VAL>`.",
+   "Declaring capacity on an exclusive lock exits 4 with `capacity not permitted on exclusive lock: <NAME>`; duplicate lock names exit 4 with `duplicate lock: <NAME>`.",
+   "Per-step `lock:` (singular) and `locks:` (plural list) are mutually exclusive; declaring both exits 4 with `lock and locks are mutually exclusive on step: <step>`.",
+   "Singular `lock:` is shorthand for exclusive acquisition of that lock even if the lock is declared shared.",
+   "Plural `locks:` entries accept only `name` and `mode` keys; unknown name exits 4 with `unknown lock reference: <NAME>`.",
+   "Requesting shared mode on a lock declared exclusive exits 4 with `cannot request shared mode on exclusive lock: <NAME>`; requesting exclusive on a shared lock is legal.",
+   "Duplicate names within one step's `locks:` exits 4 with `duplicate lock on step: <NAME>`.",
+   "Lock acquisition is atomic under a workflow-wide mutex; requests within one step are sorted by lock name ascending before acquisition to avoid deadlock."
+  ],
+  "affected_prior": [
+   "validateWorkflow (round 1) \u2014 must validate new top-level locks block.",
+   "validateStep (round 1) \u2014 must validate per-step lock/locks fields and mutual exclusion.",
+   "parseStep (round 1) \u2014 must parse lock/locks fields.",
+   "parseWorkflow (round 1) \u2014 must parse top-level locks block.",
+   "scheduler in main.go (rounds 1-5) \u2014 must integrate lock acquisition/release, atomicity, sorting, and deadlock detection without regressing max-parallel, resource reservations, or lexicographic tie-breaking.",
+   "expandMatrix/expandForeach (rounds 1,5) \u2014 cells must carry lock requests using expanded cell names as holder identity.",
+   "retry policy execution (round 3) \u2014 release locks between attempt finish and backoff; re-acquire on next attempt.",
+   "timeout_ms graceful cancellation (round 5) \u2014 locks must be released on timeout reap and SIGKILL cancel."
+  ],
+  "summary": "Round 6 adds three extension families \u2014 F24 named locks (`locks:`/`lock:`) with declaration validation, atomic acquisition/release semantics, per-attempt re-acquisition, foreach/matrix integration, and deadlock detection, plus run comparison and static linting \u2014 layered on top of rounds 1-5 without regression."
+ },
+ "instruction_head": "# flowr \u2014 named locks, run comparison, and static linting\n\nExtend the `flowr` orchestrator with three new feature families. Nothing specified in rounds 1 through 5 changes; this round is pure extension. In particular, all of the following continue to hold without regression:\n\n* validation rules and exit codes (`0`/`1`/`2`/`3`/`4`/`5`) with their precise boundaries,\n* matrix expansion, `${VAR}` four-tier interpolation, and deferred `${step.NAME.output.KEY}` resolution,\n* scheduling with `--max-pa"
+}

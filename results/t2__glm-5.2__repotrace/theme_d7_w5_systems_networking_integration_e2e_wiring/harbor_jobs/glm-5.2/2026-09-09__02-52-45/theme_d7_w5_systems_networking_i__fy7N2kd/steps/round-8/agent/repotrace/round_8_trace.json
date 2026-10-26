@@ -1,0 +1,129 @@
+{
+ "round": 8,
+ "root": "/app",
+ "graph": {
+  "n_files": 14,
+  "n_edges": 59,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "internal/circuit/breaker.go",
+    "pagerank": 0.144374,
+    "fan_in": 8,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/health/monitor.go",
+    "pagerank": 0.128373,
+    "fan_in": 5,
+    "fan_out": 9
+   },
+   {
+    "file": "internal/state/state.go",
+    "pagerank": 0.093071,
+    "fan_in": 6,
+    "fan_out": 5
+   },
+   {
+    "file": "internal/accesslog/logger.go",
+    "pagerank": 0.084497,
+    "fan_in": 6,
+    "fan_out": 1
+   },
+   {
+    "file": "internal/state/ratelimit.go",
+    "pagerank": 0.069688,
+    "fan_in": 5,
+    "fan_out": 4
+   },
+   {
+    "file": "internal/stats/stats.go",
+    "pagerank": 0.069011,
+    "fan_in": 5,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/state/routing.go",
+    "pagerank": 0.065313,
+    "fan_in": 5,
+    "fan_out": 2
+   },
+   {
+    "file": "internal/config/config.go",
+    "pagerank": 0.064308,
+    "fan_in": 4,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/ipc/server.go",
+    "pagerank": 0.063749,
+    "fan_in": 4,
+    "fan_out": 11
+   },
+   {
+    "file": "internal/router/router.go",
+    "pagerank": 0.063295,
+    "fan_in": 4,
+    "fan_out": 10
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "internal/circuit/breaker.go",
+   "internal/config/config.go",
+   "internal/state/state.go",
+   "internal/state/json.go",
+   "internal/stats/stats.go",
+   "internal/router/router.go",
+   "internal/ipc/server.go",
+   "internal/accesslog/logger.go",
+   "cmd/meshctl/main.go"
+  ],
+  "target_symbols": [
+   "HalfOpenMaxProbes",
+   "MirrorEndpoint",
+   "MirrorSamplePct",
+   "MaybeHalfOpen",
+   "AcquireProbe",
+   "ProbeSuccess",
+   "ProbeFailure",
+   "Reset",
+   "RecordMirrored",
+   "MirrorStatusView",
+   "get_mirror_status",
+   "mirror",
+   "dispatch",
+   "forward",
+   "copyConn",
+   "handleConn",
+   "Log"
+  ],
+  "behavior_constraints": [
+   "In half_open state, allow up to half_open_max_probes concurrent probe connections instead of one",
+   "When half_open probe batch limit is reached, reject further connections until the batch completes",
+   "After all probes in a batch complete, if more than half succeeded, close the circuit; otherwise reopen and restart the open timeout",
+   "half_open_max_probes global config field defaults to 3 and is reloadable via SIGHUP",
+   "Per-service mirror_endpoint (string address:port, empty disables) and mirror_sample_pct (0-100) config fields are reloadable via SIGHUP",
+   "cache-layer service config must set mirror_endpoint=127.0.0.1:8073 and mirror_sample_pct=100",
+   "When a connection is sampled for mirroring per mirror_sample_pct, dial the mirror endpoint after the primary connects and forward client-sent data to both",
+   "Mirror responses are discarded; only the primary response reaches the client",
+   "If the mirror connection fails to establish or drops, the primary connection is unaffected",
+   "A per-service mirrored_connections stat counts mirrored connections since startup"
+  ],
+  "affected_prior": [
+   "round 2 (rate-limit routing/select logic) \u2014 selectEndpoint path also flows through forward where mirroring is inserted",
+   "round 5 (acceptLoop/forward/copyConn/handleConn/dispatch) \u2014 mirror dialing and forwarding piggybacks on forward/copyConn and the new IPC command extends dispatch",
+   "round 6 (access log entry fields) \u2014 new mirrored field is added to Log entries",
+   "round 7 (dependency health rejection in forward and access log result) \u2014 mirror logic interacts with the connection handling path in forward"
+  ],
+  "summary": "This round replaces single-probe half_open circuit breaker logic with a configurable batch of concurrent probes (half_open_max_probes) and adds per-service traffic mirroring (mirror_endpoint/mirror_sample_pct) with sampling, dual-dial forwarding, a mirrored_connections stat, get_mirror_status IPC, and meshctl mirror CLI subcommand."
+ },
+ "instruction_head": "Update circuit breaker probing behavior and add connection mirroring support.\n\n**Circuit breaker half_open probes**\n\nThe half_open state currently allows exactly one probe connection at a time. Change it to allow a configurable batch of concurrent probes.\n\nAdd a global config field `half_open_max_probes` (integer, default 3). In half_open state, accept up to that many concurrent connections as probes. Once the batch limit is reached, reject further connections until the batch finishes. When all "
+}

@@ -1,0 +1,1120 @@
+[?2004hroot@n30009:/app# asciinema rec --stdin /logs/agent/recording.cast
+[?2004l[0;32masciinema: recording asciicast to /logs/agent/recording.cast[0m
+[0;32masciinema: press <ctrl-d> or type "exit" when you're done[0m
+[?2004hroot@n30009:/app# clear
+[?2004l[H[J[?2004hroot@n30009:/app# mkdir -p /app/cmd/kvstore /app/internal/engine /app/internal/wal /app/internal/memtable /app/internal/sstable /app/internal/mvcc /app/internal/tx /app/internal/compaction /app/internal/cli
+[?2004l[?2004hroot@n30009:/app# cat > /app/go.mod <<'EOF'
+[?2004l[?2004h> module kvstore
+[?2004l[?2004h> 
+[?2004l[?2004h> go 1.21
+[?2004l[?2004h> EOF
+[?2004l[?2004hroot@n30009:/app# cat > /app/internal/mvcc/snapshot.go <<'EOF'
+[?2004l[?2004h> package mvcc
+[?2004l[?2004h> 
+[?2004l[?2004h> // Snapshot represents a read-only point-in-time view of the database.
+[?2004l[?2004h> type Snapshot struct {
+[?2004l[?2004h> ID uint64
+[?2004l[?2004h> Seq uint64
+[?2004l[?2004h> }
+[?2004l[?2004h> EOF
+[?2004l[?2004hroot@n30009:/app# cat > /app/internal/mvcc/seqnum.go <<'EOF'
+[?2004l[?2004h> package mvcc
+[?2004l[?2004h> 
+[?2004l[?2004h> // SeqNum is a monotonic sequence number type.
+[?2004l[?2004h> type SeqNum uint64
+[?2004l[?2004h> EOF
+[?2004l[?2004hroot@n30009:/app# cat > /app/internal/tx/transaction.go <<'EOF'
+[?2004l[?2004h> package tx
+[?2004l[?2004h> 
+[?2004l[?2004h> const (
+[?2004l[?2004h> OpPut         = 1
+[?2004l[?2004h> OpDelete      = 2
+[?2004l[?2004h> OpDeleteRange = 3
+[?2004l[?2004h> )
+[?2004l[?2004h> 
+[?2004l[?2004h> // Operation is a buffered transaction operation.
+[?2004l[?2004h> type Operation struct {
+[?2004l[?2004h> Op    uint8
+[?2004l[?2004h> Key   string
+[?2004l[?2004h> Value string
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> // Transaction is an in-memory optimistic transaction.
+[?2004l[?2004h> type Transaction struct {
+[?2004l[?2004h> ID          uint64
+[?2004l[?2004h> SnapshotSeq uint64
+[?2004l[?2004h> Ops         []Operation
+[?2004l[?2004h> Active      bool
+[?2004l[?2004h> }
+[?2004l[?2004h> EOF
+[?2004l[?2004hroot@n30009:/app# cat > /app/internal/wal/wal.go <<'EOF'
+[?2004l[?2004h> package wal
+[?2004lcs)
+			recs = append(recs, Record{Seq: seq})
+			va[?2004h> 
+[?2004l[?2004h> import (
+[?2004l[?2004h> "bufio"
+[?2004l[?2004h> "encoding/binary"
+[?2004l[?2004h> "fmt"
+[?2004l[?2004h> "hash/crc32"
+[?2004l[?2004h> "io"
+[?2004l[?2004h> "os"
+[?2004l[?2004h> "path/filepath"
+[?2004l[?2004h> )
+[?2004l[?2004h> 
+[?2004l[?2004h> const (
+[?2004l[?2004h> EntrySingle = 1
+[?2004l[?2004h> EntryBatch  = 2
+[?2004l[?2004h> 
+[?2004l[?2004h> OpPut         = 1
+[?2004l[?2004h> OpDelete      = 2
+[?2004l[?2004h> OpDeleteRange = 3
+[?2004l[?2004h> )
+[?2004l[?2004h> 
+[?2004lr[?2004h> type Op struct {
+[?2004l[?2004h> Op    uint8
+[?2004l[?2004h> Key   string
+[?2004l[?2004h> Value string
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> type Record struct {
+[?2004l[?2004h> Seq uint64
+[?2004l[?2004h> Ops []Op
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> type WAL struct {
+[?2004l[?2004h> path string
+[?2004l[?2004h> f    *os.File
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004ln[?2004h> func New(dir string) (*WAL, error) {
+[?2004l[?2004h> p := filepath.Join(dir, "wal.log")
+[?2004l[?2004h> f, err := os.OpenFile(p, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+[?2004l[?2004h> if err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> return nil, err
+[?2004l[?2004h> }
+[?2004l[?2004h> return &WAL{path: p, f: f}, nil
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004ln[?2004h> func (w *WAL) Path() string { return w.path }
+[?2004l[?2004h> 
+[?2004l[?2004h> func (w *WAL) AppendSingle(op uint8, seq uint64, key, val string) error {
+[?2004l[?2004h> var buf []byte
+[?2004l[?2004h> buf = append(buf, EntrySingle)
+[?2004l[?2004h> buf = append(buf, op)
+[?2004l[?2004h> var u8 [8]byte
+[?2004l[?2004h> binary.LittleEndian.PutUint64(u8[:], seq)
+[?2004l[?2004h> buf = append(buf, u8[:]...)
+[?2004l[?2004h> 
+[?2004l	[?2004h> var u4 [4]byte
+[?2004l[?2004h> binary.LittleEndian.PutUint32(u4[:], uint32(len(key)))
+[?2004l[?2004h> buf = append(buf, u4[:]...)
+[?2004l[?2004h> buf = append(buf, key...)
+[?2004l[?2004h> 
+[?2004l[?2004h> binary.LittleEndian.PutUint32(u4[:], uint32(len(val)))
+[?2004l[?2004h> buf = append(buf, u4[:]...)
+[?2004l[?2004h> buf = append(buf, val...)
+[?2004l[?2004h> 
+[?2004l[?2004h> crc := crc32.ChecksumIEEE(buf)
+[?2004l[?2004h> binary.LittleEndian.PutUint32(u4[:], crc)
+[?2004l[?2004h> buf = append(buf, u4[:]...)
+[?2004l[?2004h> 
+[?2004l[?2004h> if _, err := w.f.Write(buf); err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> return err
+[?2004l[?2004h> }
+[?2004l[?2004h> return w.f.Sync()
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l [?2004h> func (w *WAL) AppendBatch(seq uint64, ops []Op) error {
+[?2004l[?2004h> var buf []byte
+[?2004l[?2004h> buf = append(buf, EntryBatch)
+[?2004l[?2004h> 
+[?2004l[?2004h> var u8 [8]byte
+[?2004l[?2004h> binary.LittleEndian.PutUint64(u8[:], seq)
+[?2004l[?2004h> buf = append(buf, u8[:]...)
+[?2004l[?2004h> 
+[?2004l[?2004h> var u4 [4]byte
+[?2004l[?2004h> binary.LittleEndian.PutUint32(u4[:], uint32(len(ops)))
+[?2004l[?2004h> buf = append(buf, u4[:]...)
+[?2004l[?2004h> 
+[?2004l[?2004h> for _, op := range ops {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> buf = append(buf, op.Op)
+[?2004l[?2004h> 
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> binary.LittleEndian.PutUint32(u4[:], uint32(len(op.Key)))
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> buf = append(buf, u4[:]...)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> buf = append(buf, op.Key...)
+[?2004l[?2004h> 
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> binary.LittleEndian.PutUint32(u4[:], uint32(len(op.Value)))
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> buf = append(buf, u4[:]...)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> buf = append(buf, op.Value...)
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> crc := crc32.ChecksumIEEE(buf)
+[?2004l[?2004h> binary.LittleEndian.PutUint32(u4[:], crc)
+[?2004l[?2004h> buf = append(buf, u4[:]...)
+[?2004l[?2004h> 
+[?2004l[?2004h> if _, err := w.f.Write(buf); err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> return err
+[?2004l[?2004h> }
+[?2004l[?2004h> return w.f.Sync()
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l"[?2004h> func (w *WAL) Truncate() error {
+[?2004l[?2004h> if w.f != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> if err := w.f.Close(); err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> return err
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> }
+[?2004l[?2004h> f, err := os.OpenFile(w.path, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
+[?2004l[?2004h> if err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> return err
+[?2004l[?2004h> }
+[?2004l[?2004h> w.f = f
+[?2004l[?2004h> return f.Sync()
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> func (w *WAL) Size() int64 {
+[?2004l[?2004h> st, err := os.Stat(w.path)
+[?2004l[?2004h> if err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> return 0
+[?2004l[?2004h> }
+[?2004l[?2004h> return st.Size()
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l
+[?2004h> func (w *WAL) Close() error {
+[?2004l[?2004h> if w.f != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> err := w.f.Close()
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> w.f = nil
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> return err
+[?2004l[?2004h> }
+[?2004l[?2004h> return nil
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> func Replay(path string) ([]Record, error) {
+[?2004l[?2004h> f, err := os.Open(path)
+[?2004l[?2004h> if err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> if os.IsNotExist(err) {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> return nil, nil
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> return nil, err
+[?2004l[?2004h> }
+[?2004l[?2004h> defer f.Close()
+[?2004l[?2004h> 
+[?2004l[?2004h> r := bufio.NewReader(f)
+[?2004l[?2004h> var recs []Record
+[?2004l[?2004h> 
+[?2004l[?2004h> for {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> entryType, err := r.ReadByte()
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> if err == io.EOF {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> break
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> if err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> return recs, nil
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> 
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> switch entryType {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> case EntrySingle:
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> op, err := r.ReadByte()
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> if err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> return recs, nil
+[?2004ll[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> seq, err := readUint64(r)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> if err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> return recs, nil
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> key, err := readString(r)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> if err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> return recs, nil
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> val, err := readString(r)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> if err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> return recs, nil
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> crc, err := readUint32(r)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> if err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> return recs, nil
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> 
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> var check []byte
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> check = append(check, EntrySingle, op)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> var u8 [8]byte
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> binary.LittleEndian.PutUint64(u8[:], seq)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> check = append(check, u8[:]...)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> var u4 [4]byte
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> binary.LittleEndian.PutUint32(u4[:], uint32(len(key)))
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> check = append(check, u4[:]...)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> check = append(check, key...)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> binary.LittleEndian.PutUint32(u4[:], uint32(len(val)))
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> check = append(check, u4[:]...)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> check = append(check, val...)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> if crc32.ChecksumIEEE(check) != crc {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> return recs, nil
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> 
+[?2004l	[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> recs = append(recs, Record{Seq: seq, Ops: []Op{{Op: op, Key: key, Value: val}}})
+[?2004l[?2004h> 
+[?2004l [?2004h> 
+cmd/      go.mod    internal/ 
+> case EntryBatch:
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> seq, err := readUint64(r)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> if err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> return recs, nil
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> count, err := readUint32(r)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> if err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> return recs, nil
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> startLen := len(recs)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> recs = append(recs, Record{Seq: seq})
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> var ops []Op
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> for i := uint32(0); i < count; i++ {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> op, err := r.ReadByte()
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> if err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> recs = recs[:startLen]
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> return recs, nil
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> key, err := readString(r)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> if err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> recs = recs[:startLen]
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> return recs, nil
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> val, err := readString(r)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> if err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> recs = recs[:startLen]
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> return recs, nil
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> ops = append(ops, Op{Op: op, Key: key, Value: val})
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> crc, err := readUint32(r)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> if err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> recs = recs[:startLen]
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> return recs, nil
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> 
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> var check []byte
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> check = append(check, EntryBatch)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> var u8 [8]byte
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> binary.LittleEndian.PutUint64(u8[:], seq)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> check = append(check, u8[:]...)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> var u4 [4]byte
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> binary.LittleEndian.PutUint32(u4[:], count)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> check = append(check, u4[:]...)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> for _, op := range ops {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> check = append(check, op.Op)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> binary.LittleEndian.PutUint32(u4[:], uint32(len(op.Key)))
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> check = append(check, u4[:]...)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> check = append(check, op.Key...)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> binary.LittleEndian.PutUint32(u4[:], uint32(len(op.Value)))
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> check = append(check, u4[:]...)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> check = append(check, op.Value...)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> if crc32.ChecksumIEEE(check) != crc {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> recs = recs[:startLen]
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> return recs, nil
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> recs[startLen].Ops = ops
+[?2004l[?2004h> 
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> default:
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> return recs, nil
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> return recs, nil
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> func readUint32(r *bufio.Reader) (uint32, error) {
+[?2004l[?2004h> var b [4]byte
+[?2004l[?2004h> if _, err := io.ReadFull(r, b[:]); err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> return 0, err
+[?2004l[?2004h> }
+[?2004l[?2004h> return binary.LittleEndian.Uint32(b[:]), nil
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> func readUint64(r *bufio.Reader) (uint64, error) {
+[?2004l[?2004h> var b [8]byte
+[?2004l[?2004h> if _, err := io.ReadFull(r, b[:]); err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> return 0, err
+[?2004l[?2004h> }
+[?2004l[?2004h> return binary.LittleEndian.Uint64(b[:]), nil
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> func readString(r *bufio.Reader) (string, error) {
+[?2004l[?2004h> n, err := readUint32(r)
+[?2004l[?2004h> if err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> return "", err
+[?2004l[?2004h> }
+[?2004l[?2004h> b := make([]byte, n)
+[?2004l[?2004h> if _, err := io.ReadFull(r, b); err != nil {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> return "", err
+[?2004l[?2004h> }
+[?2004l[?2004h> return string(b), nil
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> func (w *WAL) String() string {
+[?2004l[?2004h> return fmt.Sprintf("wal:%s", w.path)
+[?2004l[?2004h> }
+[?2004l[?2004h> EOF
+[?2004l[?2004hroot@n30009:/app# 
+[?2004l[?2004hroot@n30009:/app# cat > /app/internal/memtable/memtable.go <<'EOF'
+[?2004l[?2004h> package memtable
+[?2004l[?2004h> 
+[?2004l[?2004h> import (
+[?2004l[?2004h> "sort"
+[?2004l[?2004h> "strings"
+[?2004l[?2004h> 
+[?2004l[?2004h> "kvstore/internal/sstable"
+[?2004l[?2004h> )
+[?2004l[?2004h> 
+[?2004l[?2004h> type MemTable struct {
+[?2004l[?2004h> entries []sstable.Entry
+[?2004l[?2004h> size    int
+[?2004l[?2004h> maxSeq  uint64
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> func New() *MemTable {
+[?2004l[?2004h> return &MemTable{}
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> func (m *MemTable) Add(key, value string, seq uint64, op uint8) {
+[?2004l[?2004h> e := sstable.Entry{Key: key, Value: value, Seq: seq, Op: op}
+[?2004l[?2004h> idx := sort.Search(len(m.entries), func(i int) bool {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> if m.entries[i].Key != key {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> return m.entries[i].Key > key
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> return m.entries[i].Seq < seq
+[?2004l[?2004h> })
+[?2004l[?2004h> m.entries = append(m.entries, sstable.Entry{})
+[?2004l[?2004h> copy(m.entries[idx+1:], m.entries[idx:])
+[?2004l[?2004h> m.entries[idx] = e
+[?2004l[?2004h> m.size += len(key) + len(value)
+[?2004l[?2004h> if seq > m.maxSeq {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> m.maxSeq = seq
+[?2004l[?2004h> }
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> func (m *MemTable) Size() int    { return m.size }
+[?2004l[?2004h> func (m *MemTable) Len() int     { return len(m.entries) }
+[?2004l[?2004h> func (m *MemTable) MaxSeq() uint64 { return m.maxSeq }
+[?2004l[?2004h> 
+[?2004l[?2004h> func (m *MemTable) Get(key string, visibleSeq uint64) (sstable.Entry, bool) {
+[?2004l[?2004h> idx := sort.Search(len(m.entries), func(i int) bool {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> return m.entries[i].Key >= key
+[?2004l[?2004h> })
+[?2004l[?2004h> for i := idx; i < len(m.entries); i++ {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> if m.entries[i].Key != key {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> break
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> if m.entries[i].Seq <= visibleSeq && m.entries[i].Op != sstable.OpDeleteRange {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> return m.entries[i], true
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> }
+[?2004l[?2004h> return sstable.Entry{}, false
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> func (m *MemTable) AllEntries() []sstable.Entry {
+[?2004l[?2004h> out := make([]sstable.Entry, len(m.entries))
+[?2004l[?2004h> copy(out, m.entries)
+[?2004l[?2004h> return out
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> func (m *MemTable) EntriesInRange(start, end string) []sstable.Entry {
+[?2004l[?2004h> var out []sstable.Entry
+[?2004l[?2004h> for _, e := range m.entries {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> if keyInRange(e.Key, start, end) {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> out = append(out, e)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> }
+[?2004l[?2004h> return out
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> func (m *MemTable) RangeTombstones() []sstable.Entry {
+[?2004l[?2004h> var out []sstable.Entry
+[?2004l[?2004h> for _, e := range m.entries {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> if e.Op == sstable.OpDeleteRange {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> out = append(out, e)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> }
+[?2004l[?2004h> return out
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> func (m *MemTable) Clear() {
+[?2004l[?2004h> m.entries = nil
+[?2004l[?2004h> m.size = 0
+[?2004l[?2004h> m.maxSeq = 0
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> func keyInRange(key, start, end string) bool {
+[?2004l[?2004h> if start != "" && key < start {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> return false
+[?2004l[?2004h> }
+[?2004l[?2004h> if end != "" && key > end {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> return false
+[?2004l[?2004h> }
+[?2004l[?2004h> return true
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> func KeyInRange(key, start, end string) bool {
+[?2004l[?2004h> return keyInRange(key, start, end)
+[?2004l[?2004h> }
+[?2004l[?2004h> 
+[?2004l[?2004h> func (m *MemTable) PrefixScan(prefix string) []sstable.Entry {
+[?2004l[?2004h> var out []sstable.Entry
+[?2004l[?2004h> for _, e := range m.entries {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> if strings.HasPrefix(e.Key, prefix) {
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> 
+cmd/      go.mod    internal/ 
+> out = append(out, e)
+[?2004l[?2004h> 
+cmd/      go.mod    internal/ 
+> }
+[?2004l[?2004h> }
+[?2004l[?2004h> return out
+[?2004l[?2004h> }
+[?2004l[?2004h> EOF
+[?2004l[?2004hroot@n30009:/app# cat > /app/internal/wal/wal.go <<'EOF'
+[?2004l[?2004h> package wal
+[?2004l[?2004h> 
+[?2004l[?2004h> import (
+[?2004l   return nil, err
+    }
+    defer f.Close()
+
+    r := bufio.NewReader(f)
+    var recs []Record
+
+    for {
+        entryType, err := r.ReadByte()
+        if err == io.EOF {
+            break
+        }
+        if err != nil {
+            return recs, nil
+        }
+
+        switch entryType {
+        case EntrySingle:
+            op, err := r.ReadByte()
+            if err != nil {
+                return recs, nil
+            }
+            seq, err := readUint64(r)
+            if err != nil {
+                return recs, nil
+            }
+            key, err := readString(r)
+            if err != nil {
+                return recs, nil
+            }
+            val, err := readString(r)
+            if err != nil {
+                return recs, nil
+            }
+            crc, err := readUint32(r)
+            if err != nil {
+                return recs, nil
+            }
+
+            var check []byte
+            check = append(check, EntrySingle, op)
+            var u8 [8]byte
+            binary.LittleEndian.PutUint64(u8[:], seq)
+            check = append(check, u8[:]..[?2004h>     "bufio"
+[?2004l[?2004h>     "encoding/binary"
+[?2004l[?2004h>     "fmt"
+[?2004l[?2004h>     "hash/crc32"
+[?2004l[?2004h>     "io"
+[?2004l[?2004h>     "os"
+[?2004l[?2004h>     "path/filepath"
+[?2004l[?2004h> )
+[?2004l[?2004h

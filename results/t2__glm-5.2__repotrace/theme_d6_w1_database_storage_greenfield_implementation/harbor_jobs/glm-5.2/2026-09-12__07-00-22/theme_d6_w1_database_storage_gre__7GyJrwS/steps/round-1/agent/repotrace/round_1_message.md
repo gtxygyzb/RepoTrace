@@ -1,0 +1,32 @@
+========================================================================
+[RepoTrace] Repository guidance for the current request (round 1)
+The notes below summarize structural centrality and cross-round state.
+They are supplemental context — use your own judgment to implement.
+========================================================================
+
+## Structural centrality
+  (no file is depended on by multiple others)
+
+## Cross-round state
+Already present (from prior rounds):
+New in this round (to be created):
+  - cmd/kvstore/main.go
+  - go.mod
+  - internal/engine/engine.go
+  - internal/wal/wal.go
+  - internal/memtable/memtable.go
+  - internal/sstable/sstable.go
+  - internal/sstable/reader.go
+  - internal/sstable/writer.go
+  - internal/mvcc/snapshot.go
+  - internal/mvcc/seqnum.go
+  - internal/tx/transaction.go
+  - internal/compaction/compaction.go
+  - internal/cli/cli.go
+
+## Verification
+  - Build and run tests after modification.
+
+## Practical note
+  The terminal can hang on very large heredocs. Write files in several smaller pieces.
+========================================================================

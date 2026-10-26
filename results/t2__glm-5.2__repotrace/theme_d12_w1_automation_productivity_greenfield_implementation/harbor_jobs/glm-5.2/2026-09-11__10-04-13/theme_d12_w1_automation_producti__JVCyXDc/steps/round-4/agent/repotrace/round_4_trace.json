@@ -1,0 +1,153 @@
+{
+ "round": 4,
+ "root": "/app",
+ "graph": {
+  "n_files": 7,
+  "n_edges": 7,
+  "delta": {
+   "files_added": [
+    "cmd/flowr/expand.go",
+    "cmd/flowr/interpolate.go",
+    "cmd/flowr/parse.go",
+    "cmd/flowr/types.go",
+    "cmd/flowr/util.go",
+    "cmd/flowr/validate.go"
+   ],
+   "files_removed": [],
+   "edges_added": [
+    [
+     "cmd/flowr/expand.go",
+     "cmd/flowr/interpolate.go"
+    ],
+    [
+     "cmd/flowr/expand.go",
+     "cmd/flowr/parse.go"
+    ],
+    [
+     "cmd/flowr/expand.go",
+     "cmd/flowr/util.go"
+    ],
+    [
+     "cmd/flowr/expand.go",
+     "cmd/flowr/validate.go"
+    ],
+    [
+     "cmd/flowr/interpolate.go",
+     "cmd/flowr/util.go"
+    ],
+    [
+     "cmd/flowr/interpolate.go",
+     "cmd/flowr/validate.go"
+    ],
+    [
+     "cmd/flowr/validate.go",
+     "cmd/flowr/parse.go"
+    ]
+   ],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "cmd/flowr/parse.go",
+    "pagerank": 0.259066,
+    "fan_in": 2,
+    "fan_out": 0
+   },
+   {
+    "file": "cmd/flowr/util.go",
+    "pagerank": 0.16695,
+    "fan_in": 2,
+    "fan_out": 0
+   },
+   {
+    "file": "cmd/flowr/validate.go",
+    "pagerank": 0.16695,
+    "fan_in": 2,
+    "fan_out": 1
+   },
+   {
+    "file": "cmd/flowr/interpolate.go",
+    "pagerank": 0.117158,
+    "fan_in": 1,
+    "fan_out": 2
+   },
+   {
+    "file": "cmd/flowr/expand.go",
+    "pagerank": 0.096625,
+    "fan_in": 0,
+    "fan_out": 4
+   },
+   {
+    "file": "cmd/flowr/main.go",
+    "pagerank": 0.096625,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "cmd/flowr/types.go",
+    "pagerank": 0.096625,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "cmd/flowr/types.go",
+   "cmd/flowr/parse.go",
+   "cmd/flowr/validate.go",
+   "cmd/flowr/interpolate.go",
+   "cmd/flowr/main.go",
+   "cmd/flowr/util.go",
+   "cmd/flowr/expand.go"
+  ],
+  "target_symbols": [
+   "parseSecrets",
+   "parseArtifacts",
+   "validateSecrets",
+   "validateArtifact",
+   "validateArtifacts",
+   "buildRedactionTable",
+   "redactBytes",
+   "redactString",
+   "redactWriter",
+   "collectArtifacts",
+   "writePlan",
+   "interpolateFirstPass",
+   "resolveStepOutputs",
+   "outputValueToString",
+   "computeCacheKey",
+   "parseWorkflow",
+   "validateWorkflow",
+   "validateStep",
+   "expandMatrix",
+   "expandForeach"
+  ],
+  "behavior_constraints": [
+   "Top-level `secrets:` block permits only `keys`; unknown keys cause exit 4.",
+   "`keys` entries must match ^[A-Za-z_][A-Za-z0-9_]*$, be unique and non-empty; violations cause exit 4.",
+   "Each declared secret NAME is read from the parent process env at flowr run start; unset is treated as empty string; empty-string secret values are legal but never redacted.",
+   "${secret.NAME} is a separate namespace resolved in the first interpolation pass; bare ${NAME} never resolves to a secret value.",
+   "Referencing ${secret.NAME} for an undeclared secret is a validation error (exit 4) with message `undefined secret: <NAME>`.",
+   "A redaction table mapping each non-empty raw secret value to `***` is built before any byte is written to any sink (events.ndjson, report.json, meta.json, stdout, stderr, output.json, hook stdout/stderr, plan.json, orchestrator stdout/stderr).",
+   "Redaction replaces longer secret values before shorter ones, greedy and non-overlapping, byte-for-byte.",
+   "Cache-key computation uses the redacted form of secret values in env, cmd strings, and resolved step output substitutions.",
+   "Redaction applies to inherited/resumed steps (F17): events.ndjson contains a redacted snapshot, not a raw copy.",
+   "report.json gains top-level `secrets.declared` (sorted list of declared key names) and `secrets.redactions_applied` (total raw-value replacement count across all sinks; 0 when no secrets or all empty)."
+  ],
+  "affected_prior": [
+   "parseWorkflow (parse.go) \u2014 must parse top-level secrets block and per-step artifacts",
+   "validateWorkflow / validateStep (validate.go) \u2014 must validate secrets and artifacts, and reject undeclared ${secret.NAME} references",
+   "interpolateFirstPass (interpolate.go) \u2014 must resolve ${secret.NAME} as a separate namespace in the first pass, without fall-through",
+   "resolveStepOutputs / outputValueToString (interpolate.go) \u2014 output.json read-back must apply textual redaction before downstream ${step.NAME.output.KEY} resolution",
+   "computeCacheKey (main.go, R2) \u2014 must hash the redacted form of secret values",
+   "expandMatrix / expandForeach (expand.go) \u2014 must carry artifacts onto expanded cells",
+   "resume/inherited-step logic (F17, R3) \u2014 must produce redacted events.ndjson from prior run dir",
+   "main (main.go) \u2014 must build redaction table, wrap all sink writers, collect artifacts, emit secrets + per-step artifacts report fields, and write plan.json",
+   "report generation (R1/R2/R3) \u2014 gains secrets field and per-step artifacts list with neutral values for non-executed steps"
+  ],
+  "summary": "Round 4 hardens flowr for production observability by adding a top-level secrets block with ${secret.NAME} interpolation and global textual redaction across all run artifacts, per-step artifact collection with status-downgrade precedence, and dry-run plan.json generation."
+ },
+ "instruction_head": "# flowr \u2014 secrets, artifacts, and dry-run planning\n\nExtend the `flowr` orchestrator with three new feature families that harden it for production-grade workflow observability. All behavior from rounds 1, 2, and 3 continues to hold without regression:\n\n* validation rules and exit codes,\n* matrix expansion and `${VAR}` interpolation,\n* scheduling with `--max-parallel`, lexicographic tie-breaking, and resource reservations,\n* graceful cancellation (SIGTERM, 500 ms grace, SIGKILL),\n* content-address"
+}

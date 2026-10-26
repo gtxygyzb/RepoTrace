@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>hermetic-build-artifact-verifier — EvoCode-Bench</title>
+<link rel="stylesheet" href="../assets/site.css">
+</head><body>
+<div class="wrap">
+  <header class="top">
+    <h1>hermetic-build-artifact-verifier</h1>
+    <span class="crumb"><a href="../index.html">← all tasks</a></span>
+  </header>
+  <p class="sub">
+    <span class="pill hard">hard</span>
+    <span class="pill">code build reproducibility</span>
+    <span class="pill">7 rounds</span>
+    <span class="pill">theme_d1_w9_code_build_reproducibility_verification</span><br>
+    I need a deterministic build artifact verification tool called `buildvault` written in Go (the project skeleton with `go.mod` is already in `/app/`). This tool orchestrates compilation of multiple bui
+  </p>
+
+  <div class='analysis'><p style='margin:0'><strong>Opus-4.8 is the only model to complete all 7 rounds (100% cases) while 5 of 12 models finish zero rounds, and six requirements — led by export-cmd and audit-chain — each defeat 10 or more models.</strong></p></div>
+
+  <h2>What the agent is asked, round by round</h2>
+  <p class="sub" style="margin-top:0">Each round adds new requirements to the same workspace. Click a round to read the exact task the agent was given.</p>
+  <div id="rounds"></div>
+
+  <h2>Per-round test-case results</h2>
+  <div class="keybox">
+    <b>How to read the grid.</b> Every round ships an executable test suite. A cell like <b>43</b>/45&nbsp;<span class="xf">2✗</span>
+    means the model passed <b>43 of the round's 45 test cases</b> and <b>2 failed</b>. The round earns a reward of
+    <b>1 only if every case passes</b> — so a model can pass 43/45 and still score 0 for that round. The case counts
+    show the partial progress the 0/1 round score hides. Cell <b>color = how many cases failed</b> (green = 0).
+    A <b>build&nbsp;✗</b> cell means the model's code did not compile, so the tests could not run (a real 0 — the
+    reference solution builds fine). <b>n/a</b> means that run never reached this round. <b>Click any cell</b> for details below.
+  </div>
+  <div id="heatmap"></div>
+  <div class="legend">cases failed in the cell:
+    <i style="background:#2fae5f"></i>0<i style="background:#8ec74e"></i>1-2<i style="background:#d6c34a"></i>3-5
+    <i style="background:#e89a3c"></i>6-10<i style="background:#e3692f"></i>11-20<i style="background:#d23b34"></i>20+
+    <i style="background:#3a2730"></i>code didn't build<i style="background:#22272f"></i>round not run (n/a)</div>
+  <div id="detail"><span class="ph">Click a cell above to see the round's task and that model's failed requirements.</span></div>
+
+  <h2>Difficulty analysis</h2>
+  <div class='analysis'><p>This task builds <code>buildvault</code>, a deterministic build-artifact verification tool in Go (a skeleton with <code>go.mod</code> is provided): it must produce reproducible content hashes, lock dependencies, verify rebuilds match, run selective builds over a dependency closure, and maintain a tamper-evident audit chain. 7 rounds across 12 models. <strong>Reproducibility</strong> is the theme, so the bar is exactness — byte-identical hashes, stable lockfiles, chained hashes that validate.</p><p>The dominant obstacles span several subsystems: <span class='req'>export-cmd</span> exits 1 (11 models), while <span class='req'>audit-chain</span> returns empty output where a 64-char hash was required, and <span class='req'>selective-build</span>, <span class='req'>status-cmd</span>, <span class='req'>hooks</span>, and <span class='req'>export-chain</span> each fail 10 of 12 models — together forming a wall that prevents most models from progressing past the first few rounds regardless of how much core verifier logic is correct.</p></div>
+
+  <h2>Per-model failures (whole task)</h2>
+  <p class="sub" style="margin-top:0">Click a model to expand every requirement it failed across all rounds, with a representative reason from the verifier.</p>
+  <div id="breakdown"></div>
+
+  <h2>Performance gap</h2>
+  <div class='analysis'><p><strong>Opus-4.8 solves it outright: 7/7 rounds, 100% case pass</strong> — the only model to produce a clean run. GPT-5.5 is a clear second at 3/7 rounds and 76% cases. Qwen3.6-Plus (2/7, 91%) and DeepSeek-V4-Flash (2/7, 71%) manage two rounds each, showing that correct early-round implementations do not carry through once <span class='req'>export-cmd</span> and <span class='req'>audit-chain</span> are introduced.</p><p>The remaining eight models score 1/7 or <strong>0/7 rounds</strong>, yet case pass reveals real stratification: MiniMax-M3 reaches 93% and Qwen3.6-Plus 91% on case coverage within their passing round, while GLM-5.2 and MiniMax-M2.7 collapse to 14% and 36% respectively — the <span class='req'>selective-build</span>, <span class='req'>hooks</span>, and <span class='req'>export-chain</span> stack failing wholesale and pulling case scores down with them. The discriminator is specific: nearly every non-Opus model implements the core hash-and-lock verifier but cannot produce a working artifact export or audit chain, and those two missing pieces gate every subsequent round.</p></div>
+
+  <h2>Is the task fair? (top-model check)</h2>
+  <div class='analysis'><p>Claude Opus 4.8 passed all 7 rounds at full marks, confirming that <code>buildvault</code> is correctly specified and the test suite fairly grades each requirement — the oracle likewise clears every round without issue. Failures observed across the other 11 models — particularly the wall formed by <span class='req'>export-cmd</span>, <span class='req'>audit-chain</span>, <span class='req'>selective-build</span>, and <span class='req'>hooks</span> — therefore reflect genuine gaps in those models' ability to implement Go tooling at this complexity and fidelity, not ambiguity in the task or defects in the grading.</p></div>
+
+  <p class="foot">Test-case data extracted from the verifier <code>CASE_RESULT</code> logs of each model's run.
+    Reasons are the verifier's own <code>failure_reason</code> (back-filled from expected/actual when terse).</p>
+</div>
+
+<script src="../assets/site.js"></script>
+<script>
+fetch("../data/tasks/theme_d1_w9_code_build_reproducibility_verification.json").then(function(r){return r.json();}).then(function(T){
+  window.__MODELS__ = Object.keys(T.models);
+  var detail = document.getElementById("detail");
+  EvoViz.renderRounds(document.getElementById("rounds"), T);
+  EvoViz.renderHeatmap(document.getElementById("heatmap"), T, function(model, round){
+    EvoViz.renderDetail(detail, T, model, round);
+    detail.scrollIntoView({behavior:"smooth", block:"nearest"});
+  });
+  EvoViz.renderBreakdown(document.getElementById("breakdown"), T);
+});
+</script>
+</body></html>

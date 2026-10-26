@@ -1,0 +1,38 @@
+========================================================================
+[RepoTrace] Repository guidance for the current request (round 5)
+The notes below summarize structural centrality and cross-round state.
+They are supplemental context — use your own judgment to implement.
+========================================================================
+
+## Structural centrality
+  - csvio.go is depended on by 6 files (e.g. jsonutil.go, compare.go, profile.go, pipeline.go); changing it ripples widely.
+  - compare.go is depended on by 2 files (e.g. pipeline.go, main.go); changing it ripples widely.
+  - jsonutil.go is depended on by 2 files (e.g. compare.go, profile.go); changing it ripples widely.
+  - profile.go is depended on by 2 files (e.g. pipeline.go, main.go); changing it ripples widely.
+
+## Cross-round state
+Already present (from prior rounds):
+  - csvio.go: implementation
+  - compare.go: comparison
+  - jsonutil.go: implementation
+  - profile.go: implementation
+  - pipeline.go: pipeline logic
+  - stats.go: implementation
+  - expr.go: implementation
+  - main.go: CLI entry point
+New in this round (to be created):
+  - lineage.go
+Prior components this round may touch:
+  - ComputeFileHash/WriteCSVWithChecksum in csvio.go (SHA256->BLAKE2b-256)
+  - ingest command from round 1 (sidecar removal)
+  - transform command from round 1 (sidecar removal)
+  - manifest command (checksum algorithm)
+  - verify command (checksum algorithm)
+  - pipeline command from round 1 (new step type)
+
+## Verification
+  - Build and run tests after modification, e.g. `go build ./...`.
+
+## Practical note
+  The terminal can hang on very large heredocs. Write files in several smaller pieces.
+========================================================================

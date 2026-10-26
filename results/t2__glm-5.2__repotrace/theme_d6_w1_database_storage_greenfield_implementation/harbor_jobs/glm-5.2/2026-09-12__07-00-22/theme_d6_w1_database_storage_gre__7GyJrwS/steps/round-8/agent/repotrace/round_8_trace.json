@@ -1,0 +1,91 @@
+{
+ "round": 8,
+ "root": "/app",
+ "graph": {
+  "n_files": 5,
+  "n_edges": 1,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "internal/memtable/memtable.go",
+    "pagerank": 0.316239,
+    "fan_in": 1,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/mvcc/seqnum.go",
+    "pagerank": 0.17094,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/mvcc/snapshot.go",
+    "pagerank": 0.17094,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/tx/transaction.go",
+    "pagerank": 0.17094,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/wal/wal.go",
+    "pagerank": 0.17094,
+    "fan_in": 0,
+    "fan_out": 1
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "cmd/kvstore/main.go",
+   "internal/engine/engine.go",
+   "internal/mvcc/seqnum.go",
+   "internal/mvcc/snapshot.go",
+   "internal/tx/transaction.go",
+   "internal/wal/wal.go"
+  ],
+  "target_symbols": [
+   "BACKUP",
+   "RESTORE",
+   "Backup",
+   "Restore",
+   "SetSeqNum",
+   "max_seqnum",
+   "flushMemtable",
+   "snapshot",
+   "transaction",
+   "cursor"
+  ],
+  "behavior_constraints": [
+   "BACKUP <path> flushes the current memtable to disk before copying",
+   "BACKUP creates a consistent point-in-time copy of all current SSTable files into the given directory",
+   "backup.meta contains a header line `max_seqnum=<N>` where N is the global max seqnum at backup time",
+   "backup.meta contains one line per SSTable formatted as `<filename> <level> <max_seqnum>`",
+   "BACKUP must not include any WAL segment files in the backup directory",
+   "BACKUP outputs `OK` on success",
+   "If the backup path already exists, BACKUP overwrites it completely",
+   "RESTORE <path> clears the entire current data directory (SSTables, WAL segments, everything)",
+   "RESTORE copies the backed-up SSTables into the data directory",
+   "RESTORE rebuilds all in-memory state: level assignments, indexes, and bloom filters from copied SSTables"
+  ],
+  "affected_prior": [
+   "internal/engine/engine.go (rounds 2,3,5: SSTable writers/readers, compaction, memtable flush, indexes/bloom filters must be rebuilt)",
+   "internal/mvcc/snapshot.go (rounds 2,6: snapshot state and cursors must be invalidated on RESTORE)",
+   "internal/tx/transaction.go (transactions must be invalidated on RESTORE)",
+   "internal/mvcc/seqnum.go (round 2: seqnum counter must be resettable to restored max)",
+   "internal/wal/wal.go (round 7: WAL segment files must be cleared and re-initialized on RESTORE)",
+   "cmd/kvstore/main.go (rounds 2,4,6: command dispatch must add BACKUP/RESTORE commands)"
+  ],
+  "summary": "This round adds BACKUP and RESTORE commands that create a consistent point-in-time SSTable-only copy with a backup.meta manifest and restore it by clearing the data directory, copying SSTables back, rebuilding in-memory state, resetting the seqnum counter, and invalidating all open snapshots, transactions, and cursors."
+ },
+ "instruction_head": "Add online backup and restore. `BACKUP <path>` flushes the current memtable to disk, then creates a consistent point-in-time copy of the database at the given directory path. The backup contains copies of all current SSTable files plus a `backup.meta` file listing each SSTable filename, its level, and the max sequence number at backup time \u2014 one line per SSTable as `<filename> <level> <max_seqnum>`, with a header line `max_seqnum=<N>` where N is the global max seqnum. No WAL files in the backup."
+}

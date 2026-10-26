@@ -1,0 +1,115 @@
+{
+ "round": 5,
+ "root": "/app",
+ "graph": {
+  "n_files": 7,
+  "n_edges": 7,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "cmd/flowr/parse.go",
+    "pagerank": 0.259066,
+    "fan_in": 2,
+    "fan_out": 0
+   },
+   {
+    "file": "cmd/flowr/util.go",
+    "pagerank": 0.16695,
+    "fan_in": 2,
+    "fan_out": 0
+   },
+   {
+    "file": "cmd/flowr/validate.go",
+    "pagerank": 0.16695,
+    "fan_in": 2,
+    "fan_out": 1
+   },
+   {
+    "file": "cmd/flowr/interpolate.go",
+    "pagerank": 0.117158,
+    "fan_in": 1,
+    "fan_out": 2
+   },
+   {
+    "file": "cmd/flowr/expand.go",
+    "pagerank": 0.096625,
+    "fan_in": 0,
+    "fan_out": 4
+   },
+   {
+    "file": "cmd/flowr/main.go",
+    "pagerank": 0.096625,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "cmd/flowr/types.go",
+    "pagerank": 0.096625,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "cmd/flowr/main.go",
+   "cmd/flowr/types.go",
+   "cmd/flowr/parse.go",
+   "cmd/flowr/validate.go",
+   "cmd/flowr/interpolate.go",
+   "cmd/flowr/expand.go"
+  ],
+  "target_symbols": [
+   "main",
+   "parseStep",
+   "parseTimeoutMs",
+   "validateStep",
+   "validateTimeoutMs",
+   "parseParams",
+   "validateParams",
+   "interpolateFirstPass",
+   "interpolateStepEnv",
+   "expandMatrix",
+   "expandForeach",
+   "emitEvent",
+   "writeJSONFile"
+  ],
+  "behavior_constraints": [
+   "timeout_ms optional on step; must be integer >= 0 else exit 4 with 'invalid timeout_ms: <value>'",
+   "timeout_ms == 0 means no deadline (identical to absent)",
+   "timeout_ms applies per-attempt; retry delays (incl. jitter) never count against it",
+   "timeout_ms applies to plain, matrix, foreach, and pipe steps; for pipe, deadline spans entire pipeline (first stage spawn to last stage exit)",
+   "timeout_ms not applicable to workflow hooks; top-level timeout_ms outside a step is exit 4 'timeout_ms is only permitted on steps'",
+   "Skipped (when:) steps never spawn so their deadline never starts",
+   "plan.json steps[*] gains timeout_ms field (echoed declared value or 0 when unspecified)",
+   "On deadline reached while process alive, run R1 graceful cancellation: SIGTERM, 500ms grace, SIGKILL",
+   "step_finished exit_code = OS-reported signal code (e.g. -15/143 or -9/137); orchestrator does not rewrite",
+   "Step record in report.json gains timed_out boolean; true iff last attempt was terminated via timeout path"
+  ],
+  "affected_prior": [
+   "R1 graceful cancellation (SIGTERM/500ms/SIGKILL) now also drives per-step timeout path",
+   "R1 step scheduling/run loop must enforce per-attempt deadline timer",
+   "R1 report.json step record gains timed_out field and 'timeout' error string",
+   "R1 report.json top-level gains timeouts_summary",
+   "R1 events.ndjson gains step_timeout record kind",
+   "R1 meta.json per-step gains timed_out field",
+   "R1 stdout/stderr flushing behavior on signal-terminated processes",
+   "R1 parseStep must parse timeout_ms field",
+   "R1 validateStep must validate timeout_ms and reject top-level timeout_ms",
+   "F12 retry policy interaction: timeout counts as attempt failure; retry delays excluded from deadline",
+   "F13 when: interaction: skipped steps never start their deadline",
+   "F15 foreach per-cell deadline",
+   "F16 output.json mechanism: error precedence chain gains 'timeout' position",
+   "F17 --resume: timeouts_summary counts only live-run timeouts; inherited steps contribute nothing",
+   "F18 secrets: --param KEY colliding with secret name is a validation error"
+  ],
+  "summary": "Round 5 adds per-step timeout_ms deadlines with per-attempt graceful cancellation, step_timeout events, and timeouts_summary recap; plus a repeatable --param KEY=VAL CLI override that injects values into the interpolation env with duplicate/secret-collision validation."
+ },
+ "instruction_head": "# flowr \u2014 per-step deadlines, CLI parameter overrides, and graph emission\n\nExtend the `flowr` orchestrator with three new feature families and one targeted correction of a previously ambiguous rule. All behavior from rounds 1 through 4 continues to hold without regression:\n\n* validation rules, exit codes (`0`/`1`/`2`/`3`/`4`/`5`), and their precise boundaries,\n* matrix expansion, `${VAR}` four-tier interpolation, and deferred `${step.NAME.output.KEY}` resolution (F16),\n* scheduling with `--max-p"
+}

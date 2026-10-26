@@ -1,0 +1,160 @@
+{
+ "round": 2,
+ "root": "/app",
+ "graph": {
+  "n_files": 7,
+  "n_edges": 13,
+  "delta": {
+   "files_added": [
+    "cmd/flowctl/main.go",
+    "internal/config/config.go",
+    "internal/input/input.go",
+    "internal/output/output.go",
+    "internal/pipeline/pipeline.go",
+    "internal/record/record.go",
+    "internal/stage/stage.go"
+   ],
+   "files_removed": [],
+   "edges_added": [
+    [
+     "cmd/flowctl/main.go",
+     "internal/config/config.go"
+    ],
+    [
+     "cmd/flowctl/main.go",
+     "internal/pipeline/pipeline.go"
+    ],
+    [
+     "internal/config/config.go",
+     "internal/stage/stage.go"
+    ],
+    [
+     "internal/input/input.go",
+     "internal/config/config.go"
+    ],
+    [
+     "internal/input/input.go",
+     "internal/record/record.go"
+    ],
+    [
+     "internal/output/output.go",
+     "internal/config/config.go"
+    ],
+    [
+     "internal/output/output.go",
+     "internal/record/record.go"
+    ],
+    [
+     "internal/pipeline/pipeline.go",
+     "internal/config/config.go"
+    ],
+    [
+     "internal/pipeline/pipeline.go",
+     "internal/input/input.go"
+    ],
+    [
+     "internal/pipeline/pipeline.go",
+     "internal/output/output.go"
+    ],
+    [
+     "internal/pipeline/pipeline.go",
+     "internal/stage/stage.go"
+    ],
+    [
+     "internal/stage/stage.go",
+     "internal/config/config.go"
+    ],
+    [
+     "internal/stage/stage.go",
+     "internal/record/record.go"
+    ]
+   ],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "internal/stage/stage.go",
+    "pagerank": 0.28044,
+    "fan_in": 2,
+    "fan_out": 2
+   },
+   {
+    "file": "internal/config/config.go",
+    "pagerank": 0.255979,
+    "fan_in": 5,
+    "fan_out": 1
+   },
+   {
+    "file": "internal/record/record.go",
+    "pagerank": 0.220864,
+    "fan_in": 3,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/pipeline/pipeline.go",
+    "pagerank": 0.068753,
+    "fan_in": 1,
+    "fan_out": 4
+   },
+   {
+    "file": "internal/input/input.go",
+    "pagerank": 0.062858,
+    "fan_in": 1,
+    "fan_out": 2
+   },
+   {
+    "file": "internal/output/output.go",
+    "pagerank": 0.062858,
+    "fan_in": 1,
+    "fan_out": 2
+   },
+   {
+    "file": "cmd/flowctl/main.go",
+    "pagerank": 0.048248,
+    "fan_in": 0,
+    "fan_out": 2
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "internal/config/config.go",
+   "internal/input/input.go",
+   "internal/stage/stage.go",
+   "internal/pipeline/pipeline.go"
+  ],
+  "target_symbols": [
+   "InputConfig",
+   "StageConfig",
+   "AggregateConfig",
+   "Load",
+   "Read",
+   "readSQLite",
+   "Build",
+   "Apply",
+   "buildGroup",
+   "Run"
+  ],
+  "behavior_constraints": [
+   "Accept input.format=sqlite; resolve input.path relative to the config file directory and require a non-empty input.query or abort with flowctl: config: ...",
+   "Execute the SQLite query exactly as written without rewriting it, and produce records whose column order matches the SELECT result-set column order.",
+   "Abort with a single stderr line starting flowctl: input: ... and non-zero exit if the SQLite file is missing/unreadable or the query execution fails.",
+   "Convert SQLite values to strings: TEXT as-is, INTEGER as decimal with no leading zeros/no thousands separators and leading - for negatives, REAL as integer-valued without trailing .0 otherwise Go %g, NULL as empty string, and BLOB as a hard flowctl: input: ... error.",
+   "Count SQLite result rows toward processed in the summary exactly like CSV/NDJSON records.",
+   "Validate group config: by is an ordered non-empty list; aggregates is non-empty; each aggregate has a required non-empty unique as, op in {count,sum,min,max,avg}, and column required for every op except count; invalid config aborts with flowctl: config: ...",
+   "For each input record, compute the group key from the values of the by columns in order; a record missing any by column aborts with flowctl: group: ...",
+   "For sum/min/max/avg, parse record[column] as a finite decimal number; a non-numeric value aborts with flowctl: group: non-numeric value in column <col> at row <n>, where n is the 1-based input-source record number.",
+   "Group is a full barrier: consume all incoming records before emitting any output rows; emit groups in first-seen order.",
+   "Emit exactly len(by)+len(aggregates) columns per group output record, ordered by[0], by[1], ..., aggregates[0].as, aggregates[1].as, ...; drop all other incoming columns."
+  ],
+  "affected_prior": [
+   "Read input dispatch and CSV/NDJSON readers must remain unchanged while adding sqlite support",
+   "Build/Apply stage dispatch and existing filter/project/sort/limit stages must remain unchanged while adding group support",
+   "Run pipeline record numbering, stage execution order, and summary counting must remain stable when a group barrier is inserted",
+   "InputConfig/StageConfig config parsing and validation must accept new sqlite/group fields without altering existing configs"
+  ],
+  "summary": "This round adds a SQLite input source and a group aggregation stage while preserving all existing CLI, input, stage, and summary behavior."
+ },
+ "instruction_head": "# Add a SQLite input source and a grouping stage\n\nGrow `flowctl` so the pipeline can pull records out of a SQLite database and\ncollapse many input rows into aggregated summary rows. Keep every existing behavior exactly as it is; this change only adds\nfeatures. Nothing in the CLI invocation changes.\n\n## New input format: `sqlite`\n\n```yaml\ninput:\n  path: orders.db\n  format: sqlite\n  query: \"SELECT order_id, customer, amount, status FROM orders ORDER BY order_id\"\n```\n\n- `path` is a path to a SQLite"
+}

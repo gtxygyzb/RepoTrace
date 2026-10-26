@@ -1,0 +1,106 @@
+{
+ "round": 9,
+ "root": "/app",
+ "graph": {
+  "n_files": 6,
+  "n_edges": 8,
+  "delta": {
+   "files_added": [
+    "schema.go"
+   ],
+   "files_removed": [],
+   "edges_added": [
+    [
+     "cli.go",
+     "schema.go"
+    ],
+    [
+     "schema.go",
+     "helpers.go"
+    ],
+    [
+     "schema.go",
+     "main.go"
+    ]
+   ],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "helpers.go",
+    "pagerank": 0.407237,
+    "fan_in": 4,
+    "fan_out": 0
+   },
+   {
+    "file": "main.go",
+    "pagerank": 0.166458,
+    "fan_in": 2,
+    "fan_out": 1
+   },
+   {
+    "file": "manifest.go",
+    "pagerank": 0.116812,
+    "fan_in": 1,
+    "fan_out": 1
+   },
+   {
+    "file": "schema.go",
+    "pagerank": 0.116812,
+    "fan_in": 1,
+    "fan_out": 2
+   },
+   {
+    "file": "cli.go",
+    "pagerank": 0.09634,
+    "fan_in": 0,
+    "fan_out": 4
+   },
+   {
+    "file": "types.go",
+    "pagerank": 0.09634,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "cli.go",
+   "main.go",
+   "types.go"
+  ],
+  "target_symbols": [
+   "parseArgs",
+   "nextArg",
+   "run",
+   "buildRejects",
+   "ingest",
+   "buildManifest",
+   "writeAuditLog"
+  ],
+  "behavior_constraints": [
+   "`--rejects-format` accepts exactly one of {legacy, tagged, tagged-sorted}; default/omitted is legacy.",
+   "Invalid `--rejects-format` value (empty, prefix, case variant, any other token) \u2192 exit 2, no output files, stderr line exactly: `ingest: --rejects-format: must be one of {legacy, tagged, tagged-sorted}`.",
+   "`--rejects-format` missing its argument value \u2192 exit 2 (Go flag parser usage error).",
+   "`--rejects-format tagged` (or tagged-sorted) without `--audit-log` \u2192 exit 2, no output files, stderr line exactly: `ingest: --rejects-format tagged requires --audit-log`.",
+   "`--rejects-format-header` is a valueless boolean flag; supplying `=value` \u2192 exit 2 (Go flag parser error).",
+   "`--rejects-format-header` without `--rejects-format tagged` or `tagged-sorted` \u2192 exit 2, no output files, stderr line exactly: `ingest: --rejects-format-header requires --rejects-format tagged`.",
+   "Validation order: enum-value check at parse time; both dependency checks run before any output file (including `.tmp`) is written.",
+   "`legacy` format (default or explicit) is byte-for-byte identical to existing rejects output, with and without `--dedup-policy first-arrival`.",
+   "`tagged` format: every non-empty reject is one line terminated by exactly one `\\n`; no leading/trailing blank lines.",
+   "Tagged column layout (no first-arrival dedup): exactly 5 tab-separated columns `<bucket>\\t<reason_code>\\t<shard>\\t<line_no>\\t<raw_line>\\n`."
+  ],
+  "affected_prior": [
+   "buildRejects (round 3 rejects output)",
+   "writeAuditLog / audit-log feature (round 3) \u2014 tagged rejects is a projection of audit-log reject records",
+   "--dedup-policy first-arrival trailing columns (round 6)",
+   "buildManifest / writeManifest / writeSignature (round 5) \u2014 manifest/signature must reflect chosen rejects bytes",
+   "schema sidecar digest (round 8) \u2014 schema/digest must reflect chosen rejects bytes",
+   "ingest (rounds 4, 7) \u2014 flow must plumb rejects-format config"
+  ],
+  "summary": "Round 9 adds a `--rejects-format <legacy|tagged|tagged-sorted>` selector and `--rejects-format-header` flag to `eventq ingest`, emitting a canonical tab-separated tagged rejects file (projected from audit-log reject records) with strict validation, while keeping legacy output byte-identical and ensuring digest/schema/manifest/signature reflect the chosen rejects bytes."
+ },
+ "instruction_head": "# Canonical Rejects Formats\n\nThe existing `--rejects` file records rejected raw lines, but it does not by\nitself expose the reject bucket, reason code, shard, or line number for each\nrow. Add an explicit `--rejects-format <legacy|tagged|tagged-sorted>` selector\nand a canonical tagged shape so downstream consumers can read that metadata\nwithout replaying the pipeline or cross-referencing the audit log.\n\n`legacy` is the default and preserves the existing on-disk reject bytes.\n`tagged` emits bucket"
+}

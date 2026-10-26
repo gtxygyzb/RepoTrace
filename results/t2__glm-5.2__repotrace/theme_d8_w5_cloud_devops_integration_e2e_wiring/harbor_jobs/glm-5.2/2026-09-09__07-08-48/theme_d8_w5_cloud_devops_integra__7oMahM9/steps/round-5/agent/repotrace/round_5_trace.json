@@ -1,0 +1,60 @@
+{
+ "round": 5,
+ "root": "/app",
+ "graph": {
+  "n_files": 1,
+  "n_edges": 0,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "pipeline.sh",
+    "pagerank": 1.0,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "pipeline.sh"
+  ],
+  "target_symbols": [
+   "lock",
+   "unlock",
+   "deploy",
+   "promote",
+   "rollback",
+   "restore",
+   "status",
+   "history"
+  ],
+  "behavior_constraints": [
+   "`lock <env> [--reason REASON]` prints `LOCKED <env>: <reason>` with default reason `manual lock`; is idempotent (updates reason if already locked); errors `ERROR: unknown environment <env>` for unknown env.",
+   "`unlock <env>` prints `UNLOCKED <env>`, is idempotent (not an error if already unlocked), and errors `ERROR: unknown environment <env>` for unknown env.",
+   "`lock --list` prints currently locked environments alphabetically as `<env>: <reason> (locked since <ISO8601_timestamp>)` and prints nothing if none are locked.",
+   "Lock state persists across command invocations via filesystem storage.",
+   "When an environment is locked, `deploy`, `promote` (when target env is locked), `rollback`, and `restore` must fail with `ERROR: <env> is locked (<reason>)` and make no state changes.",
+   "Read-only commands (`status`, `diff`, `history`, `snapshot`, `validate`, `order`, `build`, `test`, `graph`, `bump`, `lock`, `unlock`) continue to work on locked environments.",
+   "`status <env>` detail view includes `[LOCKED: <reason>]` at the top before service listings when locked, and adds nothing when unlocked.",
+   "`lock` writes a LOCK event to the environment's JSONL event log with timestamp, iso_timestamp, action LOCK, service `-`, version `-`, and reason.",
+   "`unlock` writes an UNLOCK event to the environment's JSONL event log with timestamp, iso_timestamp, action UNLOCK, service `-`, version `-`.",
+   "`history <env>` displays LOCK events as `<iso_timestamp> LOCK <reason>` and UNLOCK events as `<iso_timestamp> UNLOCK`, interleaved chronologically with DEPLOY/ROLLBACK/PROMOTE/RESTORE events."
+  ],
+  "affected_prior": [
+   "deploy",
+   "promote",
+   "rollback",
+   "restore",
+   "status",
+   "history"
+  ],
+  "summary": "Add persistent environment locking with lock/unlock/list commands, enforce lock blocks on destructive operations, and integrate lock status and audit events into status and history."
+ },
+ "instruction_head": "Add environment locking to the pipeline orchestrator. Locking prevents destructive operations on an environment while allowing read-only queries to continue.\n\n**`pipeline.sh lock <environment> [--reason REASON]`** \u2014 Lock an environment. Output: `LOCKED <env>: <reason>` (default reason is `manual lock` if not specified). Locking an already-locked environment updates the reason and prints the same output (idempotent). Error if the environment doesn't exist in the manifest: `ERROR: unknown environm"
+}

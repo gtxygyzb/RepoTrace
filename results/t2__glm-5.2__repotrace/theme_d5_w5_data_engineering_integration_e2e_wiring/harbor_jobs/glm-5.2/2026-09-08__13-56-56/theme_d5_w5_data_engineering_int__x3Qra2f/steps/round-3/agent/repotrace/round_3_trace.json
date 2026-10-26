@@ -1,0 +1,163 @@
+{
+ "round": 3,
+ "root": "/app",
+ "graph": {
+  "n_files": 9,
+  "n_edges": 25,
+  "delta": {
+   "files_added": [
+    "internal/input/sqlite.go",
+    "internal/stage/group.go"
+   ],
+   "files_removed": [],
+   "edges_added": [
+    [
+     "internal/config/config.go",
+     "internal/stage/group.go"
+    ],
+    [
+     "internal/input/input.go",
+     "internal/input/sqlite.go"
+    ],
+    [
+     "internal/input/sqlite.go",
+     "internal/config/config.go"
+    ],
+    [
+     "internal/input/sqlite.go",
+     "internal/record/record.go"
+    ],
+    [
+     "internal/input/sqlite.go",
+     "internal/stage/group.go"
+    ],
+    [
+     "internal/pipeline/pipeline.go",
+     "internal/input/sqlite.go"
+    ],
+    [
+     "internal/pipeline/pipeline.go",
+     "internal/stage/group.go"
+    ],
+    [
+     "internal/stage/group.go",
+     "internal/config/config.go"
+    ],
+    [
+     "internal/stage/group.go",
+     "internal/input/sqlite.go"
+    ],
+    [
+     "internal/stage/group.go",
+     "internal/record/record.go"
+    ],
+    [
+     "internal/stage/group.go",
+     "internal/stage/stage.go"
+    ],
+    [
+     "internal/stage/stage.go",
+     "internal/stage/group.go"
+    ]
+   ],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "internal/config/config.go",
+    "pagerank": 0.199397,
+    "fan_in": 7,
+    "fan_out": 2
+   },
+   {
+    "file": "internal/stage/group.go",
+    "pagerank": 0.199064,
+    "fan_in": 4,
+    "fan_out": 4
+   },
+   {
+    "file": "internal/record/record.go",
+    "pagerank": 0.178388,
+    "fan_in": 5,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/stage/stage.go",
+    "pagerank": 0.167325,
+    "fan_in": 3,
+    "fan_out": 3
+   },
+   {
+    "file": "internal/input/sqlite.go",
+    "pagerank": 0.093994,
+    "fan_in": 3,
+    "fan_out": 3
+   },
+   {
+    "file": "internal/pipeline/pipeline.go",
+    "pagerank": 0.047758,
+    "fan_in": 1,
+    "fan_out": 6
+   },
+   {
+    "file": "internal/input/input.go",
+    "pagerank": 0.04028,
+    "fan_in": 1,
+    "fan_out": 3
+   },
+   {
+    "file": "internal/output/output.go",
+    "pagerank": 0.04028,
+    "fan_in": 1,
+    "fan_out": 2
+   },
+   {
+    "file": "cmd/flowctl/main.go",
+    "pagerank": 0.033514,
+    "fan_in": 0,
+    "fan_out": 2
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "internal/config/config.go",
+   "internal/stage/stage.go",
+   "internal/stage/join.go",
+   "internal/record/record.go",
+   "internal/input/input.go"
+  ],
+  "target_symbols": [
+   "JoinConfig",
+   "buildJoin",
+   "Apply",
+   "Build",
+   "Read",
+   "InputConfig",
+   "Set",
+   "Copy"
+  ],
+  "behavior_constraints": [
+   "kind must be 'inner' or 'left'; any other value is a config error prefixed 'flowctl: config: ...'",
+   "on must be a non-empty ordered list of column names present on both left and right records",
+   "right.input has the same shape as top-level input (path+format required, optional query for sqlite) and path resolves relative to the pipeline config file directory",
+   "right.select optional; when present projects each right record to exactly those columns in listed order, missing columns become ''",
+   "right.select omitted: right schema is the first right record's column order (CSV header order, NDJSON first-line key order, SQLite SELECT column order)",
+   "right.prefix default '' is prefixed to every non-on right column name added to the left record",
+   "Right side is loaded exactly once at the start of the join stage",
+   "Right-source I/O/parse/decode errors are emitted as a single stderr line starting with 'flowctl: input: ' and process exits non-zero",
+   "SQLite BLOB on the right side is a hard error with 'flowctl: input: ' prefix",
+   "Match is exact string equality of on-column values; no numeric coercion, trimming, or case folding"
+  ],
+  "affected_prior": [
+   "internal/stage/stage.go (Build/Apply stage dispatch needs new 'join' case)",
+   "internal/input/input.go (Read reused to load right.input)",
+   "internal/config/config.go (StageConfig/parsing must recognize join block)",
+   "internal/pipeline/pipeline.go (per-input row numbering must survive join row expansion)",
+   "internal/record/record.go (Set/Copy used to splice right fields onto left record)"
+  ],
+  "summary": "Add a new 'join' stage that loads a second data source once, matches records by string equality on required 'on' columns (with empty-string exclusion), and splices selected/prefixed non-on right columns onto left records under inner/left semantics while preserving all existing input, stage, summary, and row-numbering behavior."
+ },
+ "instruction_head": "# Add a `join` stage so pipelines can enrich records from a second source\n\nGrow `flowctl` so that a pipeline can pull rows from a **second** data source\nand splice fields from those rows onto the records flowing through the\npipeline. All existing behavior stays as-is; this change only adds a\nnew stage type called `join`.\n\n## New stage: `join`\n\n```yaml\n- type: join\n  kind: left            # or \"inner\"\n  on: [customer]         # one or more columns\n  right:\n    input:\n      path: customers.csv\n   "
+}

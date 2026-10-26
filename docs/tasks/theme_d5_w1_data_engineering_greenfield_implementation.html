@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>eventq-pipeline — EvoCode-Bench</title>
+<link rel="stylesheet" href="../assets/site.css">
+</head><body>
+<div class="wrap">
+  <header class="top">
+    <h1>eventq-pipeline</h1>
+    <span class="crumb"><a href="../index.html">← all tasks</a></span>
+  </header>
+  <p class="sub">
+    <span class="pill hard">hard</span>
+    <span class="pill">data engineering</span>
+    <span class="pill">13 rounds</span>
+    <span class="pill">theme_d5_w1_data_engineering_greenfield_implementation</span><br>
+    We are building a data-engineering command-line tool that turns raw event logs into clean, currency-normalized summaries. Please implement it from scratch in Go under `/app`. The tool must build into 
+  </p>
+
+  <div class='analysis'><p style='margin:0'><strong>Opus-4.8 dominates this 13-round data pipeline (10/13, 95% cases) among 12 models while GPT-5.5 is a distant second at 3/13 — and a shared sharding/provenance/schema core collapses seven models to 0/13.</strong></p></div>
+
+  <h2>What the agent is asked, round by round</h2>
+  <p class="sub" style="margin-top:0">Each round adds new requirements to the same workspace. Click a round to read the exact task the agent was given.</p>
+  <div id="rounds"></div>
+
+  <h2>Per-round test-case results</h2>
+  <div class="keybox">
+    <b>How to read the grid.</b> Every round ships an executable test suite. A cell like <b>43</b>/45&nbsp;<span class="xf">2✗</span>
+    means the model passed <b>43 of the round's 45 test cases</b> and <b>2 failed</b>. The round earns a reward of
+    <b>1 only if every case passes</b> — so a model can pass 43/45 and still score 0 for that round. The case counts
+    show the partial progress the 0/1 round score hides. Cell <b>color = how many cases failed</b> (green = 0).
+    A <b>build&nbsp;✗</b> cell means the model's code did not compile, so the tests could not run (a real 0 — the
+    reference solution builds fine). <b>n/a</b> means that run never reached this round. <b>Click any cell</b> for details below.
+  </div>
+  <div id="heatmap"></div>
+  <div class="legend">cases failed in the cell:
+    <i style="background:#2fae5f"></i>0<i style="background:#8ec74e"></i>1-2<i style="background:#d6c34a"></i>3-5
+    <i style="background:#e89a3c"></i>6-10<i style="background:#e3692f"></i>11-20<i style="background:#d23b34"></i>20+
+    <i style="background:#3a2730"></i>code didn't build<i style="background:#22272f"></i>round not run (n/a)</div>
+  <div id="detail"><span class="ph">Click a cell above to see the round's task and that model's failed requirements.</span></div>
+
+  <h2>Difficulty analysis</h2>
+  <div class='analysis'><p>This is a long (13-round) <strong>greenfield data-engineering</strong> build: <code>eventq</code>, a CLI that turns raw event logs into clean, currency-normalized summaries — parsing, deduplication, sessionization, currency conversion via FX rates, sharded reporting, and reproducible run provenance. The 13-round chain accumulates a deep contract surface, and each round's all-or-nothing verifier re-checks everything built so far.</p><p>Across 12 models the hardest commonly-failed requirements cluster in the reporting and provenance layers: <span class='req'>sharding-report</span>, <span class='req'>sharding-histogram</span>, and <span class='req'>time-range-observed</span> each fail 11 of 12 models, while <span class='req'>summary-schema-out</span>, <span class='req'>schema-provenance</span>, and <span class='req'>schema-digest</span> fail 10 of 12. The failure modes split between silent wrong values — <span class='req'>sharding-report</span> and <span class='req'>time-range-observed</span> produce empty output — and hard exits: <span class='req'>schema-digest</span> exits 2 with <em>"ingest requires --input-dir, --rates, --output, --rejects, --session-gap, --watermark-lag"</em>, and <span class='req'>summary-schema-out</span> similarly exits 2 rather than emitting the expected sidecar.</p></div>
+
+  <h2>Per-model failures (whole task)</h2>
+  <p class="sub" style="margin-top:0">Click a model to expand every requirement it failed across all rounds, with a representative reason from the verifier.</p>
+  <div id="breakdown"></div>
+
+  <h2>Performance gap</h2>
+  <div class='analysis'><p>This is a <strong>one-model task</strong>. <strong>Opus-4.8 reaches 10/13 rounds at 95% case pass</strong>, losing only the latest sharding and time-range cases. The drop-off is immediate and severe: GPT-5.5 is second at 3/13 and 49% case pass, followed by Qwen3.7-Max at 2/13 and 43%. Three models — Kimi-K2.7-Code (23%), DeepSeek-V4-Pro (15%), and GLM-5.1 (22%) — each pass exactly 1/13 rounds.</p><p>The remaining six models all score <strong>0/13 rounds</strong>, with case rates confirming genuine failure rather than hidden progress: Kimi-K2.6 32%, GLM-5.2 9%, Qwen3.6-Plus 14%, MiniMax-M2.7 5%, and <strong>DeepSeek-V4-Flash and MiniMax-M3 both at just 3%</strong>. Everyone outside Opus collapses on the same sharding/provenance/schema reporting core, so the gap is less about which subtle requirement a model misses and more that only Opus sustains a correct, reproducible pipeline across all 13 rounds.</p></div>
+
+  <h2>Is the task fair? (top-model check)</h2>
+  <div class='analysis'><p>Opus-4.8 passed rounds 1–3, 5–10, and 12 (10 of 13), confirming that the task structure and test harness are sound for the vast majority of the pipeline. Its first failure comes in round 4 — <em>Strict Rates and FX Reason Corrections</em> — where it passed 13 of 28 cases: <span class='req'>rates-validation</span> failed on 3 cases because Opus produced the wrong error message text when given a bad day key (rc=2 but the message did not match the expected literal), and <span class='req'>rates-strict</span> failed because the output and rejects files were not byte-identical to the oracle (rcn=0, rcs=2). The oracle passes that round cleanly, so these are genuine precision gaps in Opus's FX-rate handling — not a grading artifact — and weaker models failing the same round should be read as a capability ceiling, not a test defect.</p></div>
+
+  <p class="foot">Test-case data extracted from the verifier <code>CASE_RESULT</code> logs of each model's run.
+    Reasons are the verifier's own <code>failure_reason</code> (back-filled from expected/actual when terse).</p>
+</div>
+
+<script src="../assets/site.js"></script>
+<script>
+fetch("../data/tasks/theme_d5_w1_data_engineering_greenfield_implementation.json").then(function(r){return r.json();}).then(function(T){
+  window.__MODELS__ = Object.keys(T.models);
+  var detail = document.getElementById("detail");
+  EvoViz.renderRounds(document.getElementById("rounds"), T);
+  EvoViz.renderHeatmap(document.getElementById("heatmap"), T, function(model, round){
+    EvoViz.renderDetail(detail, T, model, round);
+    detail.scrollIntoView({behavior:"smooth", block:"nearest"});
+  });
+  EvoViz.renderBreakdown(document.getElementById("breakdown"), T);
+});
+</script>
+</body></html>

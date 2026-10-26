@@ -1,0 +1,106 @@
+{
+ "round": 7,
+ "root": "/app",
+ "graph": {
+  "n_files": 10,
+  "n_edges": 24,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "internal/mlck/checkpoint.go",
+    "pagerank": 0.272082,
+    "fan_in": 7,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/compare/compare.go",
+    "pagerank": 0.130696,
+    "fan_in": 4,
+    "fan_out": 3
+   },
+   {
+    "file": "internal/drift/drift.go",
+    "pagerank": 0.122313,
+    "fan_in": 3,
+    "fan_out": 3
+   },
+   {
+    "file": "internal/merge/merge.go",
+    "pagerank": 0.122313,
+    "fan_in": 3,
+    "fan_out": 3
+   },
+   {
+    "file": "internal/app/app.go",
+    "pagerank": 0.102943,
+    "fan_in": 2,
+    "fan_out": 7
+   },
+   {
+    "file": "internal/lineage/lineage.go",
+    "pagerank": 0.061385,
+    "fan_in": 2,
+    "fan_out": 1
+   },
+   {
+    "file": "internal/manifest/manifest.go",
+    "pagerank": 0.061385,
+    "fan_in": 2,
+    "fan_out": 1
+   },
+   {
+    "file": "internal/report/report.go",
+    "pagerank": 0.050627,
+    "fan_in": 1,
+    "fan_out": 4
+   },
+   {
+    "file": "cmd/repro-verify/main.go",
+    "pagerank": 0.038127,
+    "fan_in": 0,
+    "fan_out": 1
+   },
+   {
+    "file": "main.go",
+    "pagerank": 0.038127,
+    "fan_in": 0,
+    "fan_out": 1
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "internal/lineage/lineage.go",
+   "internal/report/report.go",
+   "internal/app/app.go"
+  ],
+  "target_symbols": [
+   "Audit",
+   "detectCycle",
+   "Generate",
+   "runAuditLineage",
+   "runGenerateReport"
+  ],
+  "behavior_constraints": [
+   "audit-lineage must NOT flag a child whose timestamp equals its parent's timestamp as a timestamp violation; only strictly-earlier child timestamps are violations",
+   "generate-report's lineage validation path must apply the same relaxed timestamp rule (equal timestamps allowed, only child-before-parent flagged)",
+   "When lineage is valid, audit-lineage JSON result must include an `experiment_depths` field mapping each experiment ID to its integer depth in the DAG with roots at depth 1",
+   "When lineage is valid, audit-lineage JSON result must include a `max_width` field equal to the maximum count of experiments sharing any single depth level",
+   "Existing cycle detection and other lineage audit behaviors must remain intact"
+  ],
+  "affected_prior": [
+   "Audit (round 1 lineage auditing)",
+   "Generate (round 1/3 report generation with lineage validation)",
+   "runAuditLineage (round 3 switched to full audit-lineage)",
+   "runGenerateReport (round 3 fixed missing-tensor failure)"
+  ],
+  "summary": "This round relaxes timestamp validation in audit-lineage and generate-report to allow equal parent/child timestamps, and adds experiment_depths and max_width summary fields to a valid audit-lineage result."
+ },
+ "instruction_head": "The timestamp validation in `audit-lineage` is too strict: it rejects experiments whose timestamps are exactly equal to their parent's timestamp. When experiments are spawned immediately after their parent, second-level precision often makes them share the same timestamp. Only flag timestamps where the child is strictly *before* the parent -- equal timestamps should be allowed.\n\nThe same overly-strict timestamp logic also exists in `generate-report`'s lineage validation path. Fix it there as wel"
+}

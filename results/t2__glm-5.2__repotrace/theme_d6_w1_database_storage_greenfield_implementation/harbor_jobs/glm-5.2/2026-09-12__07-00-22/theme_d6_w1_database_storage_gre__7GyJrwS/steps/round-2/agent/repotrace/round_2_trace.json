@@ -1,0 +1,103 @@
+{
+ "round": 2,
+ "root": "/app",
+ "graph": {
+  "n_files": 5,
+  "n_edges": 1,
+  "delta": {
+   "files_added": [
+    "internal/memtable/memtable.go",
+    "internal/mvcc/seqnum.go",
+    "internal/mvcc/snapshot.go",
+    "internal/tx/transaction.go",
+    "internal/wal/wal.go"
+   ],
+   "files_removed": [],
+   "edges_added": [
+    [
+     "internal/wal/wal.go",
+     "internal/memtable/memtable.go"
+    ]
+   ],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "internal/memtable/memtable.go",
+    "pagerank": 0.316239,
+    "fan_in": 1,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/mvcc/seqnum.go",
+    "pagerank": 0.17094,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/mvcc/snapshot.go",
+    "pagerank": 0.17094,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/tx/transaction.go",
+    "pagerank": 0.17094,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/wal/wal.go",
+    "pagerank": 0.17094,
+    "fan_in": 0,
+    "fan_out": 1
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "cmd/kvstore/main.go",
+   "internal/engine/engine.go",
+   "internal/wal/wal.go",
+   "internal/memtable/memtable.go",
+   "internal/mvcc/snapshot.go",
+   "internal/tx/transaction.go"
+  ],
+  "target_symbols": [
+   "main",
+   "AppendSingle",
+   "AppendBatch",
+   "Replay",
+   "PointEntry",
+   "Add",
+   "AllEntries",
+   "EntriesInRange",
+   "PrefixScan",
+   "RangeTombstones",
+   "SSTable",
+   "SSTableReader"
+  ],
+  "behavior_constraints": [
+   "PUT --ttl <seconds> sets key to expire that many seconds after write time (wall-clock Unix seconds)",
+   "GET on an expired key returns NOT_FOUND",
+   "SCAN excludes expired keys from results",
+   "Compaction may GC expired keys but must respect MVCC snapshot visibility \u2014 a snapshot taken before the expiration timestamp still sees the key",
+   "TTL <key> returns remaining seconds until expiration as an integer rounded down, -1 if the key has no TTL, or NOT_FOUND if the key does not exist",
+   "PUT without --ttl on a key that previously had a TTL clears the TTL",
+   "TX_PUT and BATCH PUT accept --ttl <seconds>",
+   "STATS includes expired_keys (count of keys whose TTL elapsed but not yet GC'd) and total_keys must exclude expired keys",
+   "WAL single entry format: expire_at (uint64 LE, Unix seconds, 0 = no expiration) immediately after seqnum",
+   "WAL batch op format: op (uint8) + expire_at (uint64 LE) + key_len (uint32 LE) + key + val_len (uint32 LE) + value"
+  ],
+  "affected_prior": [
+   "WAL (binary format change \u2014 AppendSingle/AppendBatch/Replay must read/write expire_at)",
+   "MemTable (PointEntry struct gains expire_at; Add/AllEntries/EntriesInRange/PrefixScan/RangeTombstones must filter or expose expiration)",
+   "SSTable / SSTableReader (data block entry format change adds expire_at after seqnum)",
+   "Engine (GET/SCAN/STATS/TTL command logic must account for expiration and MVCC visibility)",
+   "CLI main (PUT/TX_PUT/BATCH PUT parsing gains --ttl flag; new TTL command; STATS output changes)"
+  ],
+  "summary": "Add TTL-based key expiration persisted in WAL and SSTables, with expired keys behaving as deleted across GET/SCAN/compaction, a new TTL command, --ttl support on PUT/TX_PUT/BATCH PUT, and STATS reporting expired_keys while excluding them from total_keys."
+ },
+ "instruction_head": "I need key expiration support. Add a `--ttl <seconds>` flag to `PUT` \u2014 when set, the key expires after that many seconds from the time of the write (use wall-clock time). Expired keys behave exactly like deleted keys: `GET` returns `NOT_FOUND`, `SCAN` excludes them, and compaction can GC them (respecting MVCC snapshot visibility \u2014 a snapshot taken before expiration still sees the key).\n\nNew command: `TTL <key>` \u2014 returns the remaining seconds until expiration (integer, rounded down), `-1` if the"
+}

@@ -1,0 +1,67 @@
+{
+ "round": 8,
+ "root": "/app",
+ "graph": {
+  "n_files": 2,
+  "n_edges": 2,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "deps.go",
+    "pagerank": 0.5,
+    "fan_in": 1,
+    "fan_out": 1
+   },
+   {
+    "file": "main.go",
+    "pagerank": 0.5,
+    "fan_in": 1,
+    "fan_out": 1
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "main.go"
+  ],
+  "target_symbols": [
+   "Target",
+   "execute",
+   "runBuild",
+   "runBuildCommand",
+   "loadConfig",
+   "expandMatrixTargets",
+   "computeCacheKey",
+   "markSkipped"
+  ],
+  "behavior_constraints": [
+   "Target struct gains an integer `retry` field defaulting to 0",
+   "On failure (pre_build hook, command, or post_build hook non-zero exit) with remaining retry attempts, the entire sequence (all pre_build hooks, command, all post_build hooks) restarts from the beginning",
+   "Each retry attempt starts with a fresh hook environment; BUILDCTL_ENV exports from a prior attempt do not carry over",
+   "The timeout deadline is set once before the first attempt and never reset between retries",
+   "A target that eventually succeeds has status `built`; one that exhausts retry+1 attempts has status `failed`",
+   "JSON build report includes an integer `attempts` field on every target entry",
+   "Cached targets report attempts=1; skipped or cancelled targets report attempts=0",
+   "In fail-fast default mode a target is declared failed only after all retries are exhausted, and independent targets may continue starting while it retries",
+   "If the pipeline halts due to another target's failure while a target is between retry attempts, that target gets status `cancelled` with attempts equal to attempts already completed",
+   "Matrix-expanded targets inherit the integer retry value without ${key} substitution"
+  ],
+  "affected_prior": [
+   "Target (matrix expansion, hooks)",
+   "execute (fail-fast, hooks, timeout)",
+   "runBuild/runBuildCommand (fail-fast summaries, profile report)",
+   "loadConfig (parsing target fields)",
+   "expandMatrixTargets (matrix inheritance)",
+   "computeCacheKey (cache key inputs)",
+   "markSkipped (skipped/cancelled status)"
+  ],
+  "summary": "This round adds a per-target integer `retry` field that re-runs the entire pre_build/command/post_build sequence on failure with a shared single timeout and fresh hook env per attempt, reports an `attempts` count in the JSON build report, and integrates with fail-fast cancellation while leaving the cache key and deps command untouched."
+ },
+ "instruction_head": "Add target retry. Targets gain a `retry` field (integer, default 0 meaning no retry). When a target's execution fails (any step in the pre_build hooks, the main command, or the post_build hooks exits non-zero) and the target has remaining retry attempts, the entire execution sequence (all pre_build hooks, then command, then all post_build hooks) restarts from the beginning. Each retry attempt begins with a fresh hook environment -- `BUILDCTL_ENV` exports from a previous attempt's hooks do not ca"
+}

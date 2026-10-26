@@ -1,0 +1,79 @@
+{
+ "round": 3,
+ "root": "/app",
+ "graph": {
+  "n_files": 5,
+  "n_edges": 1,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "internal/memtable/memtable.go",
+    "pagerank": 0.316239,
+    "fan_in": 1,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/mvcc/seqnum.go",
+    "pagerank": 0.17094,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/mvcc/snapshot.go",
+    "pagerank": 0.17094,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/tx/transaction.go",
+    "pagerank": 0.17094,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/wal/wal.go",
+    "pagerank": 0.17094,
+    "fan_in": 0,
+    "fan_out": 1
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "internal/engine/engine.go",
+   "cmd/kvstore/main.go"
+  ],
+  "target_symbols": [
+   "compactL0ToL1",
+   "writeSSTable",
+   "SSTableWriter",
+   "SSTableReader",
+   "readBlock",
+   "VerifySSTables",
+   "main"
+  ],
+  "behavior_constraints": [
+   "L0-to-L1 compaction must retain key versions still visible to active MVCC snapshots; after such compaction, snapshots must not return NOT_FOUND for keys whose versions existed at snapshot time.",
+   "Full compaction behavior for snapshot visibility must remain correct and unchanged.",
+   "Every SSTable data block must be followed by a 4-byte little-endian CRC-32 (IEEE) checksum of the block's raw bytes.",
+   "SSTable index entry block_size must exclude the trailing checksum bytes.",
+   "SSTable reader must verify each data block checksum on read and return 'ERROR: data corruption detected' on mismatch.",
+   "VERIFY command must scan every SSTable file in the data directory and validate footer magic, all data block checksums, bloom filter integrity, and index integrity.",
+   "VERIFY must print 'OK' if all files are clean; otherwise print 'CORRUPT: <filename> (<reason>)' per corrupt file and a final 'VERIFY_FAILED: <N> file(s) corrupted'."
+  ],
+  "affected_prior": [
+   "L0-to-L1 compaction path in internal/engine/engine.go",
+   "MVCC snapshot reads in internal/mvcc/snapshot.go",
+   "SSTable writer/reader format from round 1",
+   "CLI command dispatch in cmd/kvstore/main.go"
+  ],
+  "summary": "Fix L0-to-L1 compaction to preserve snapshot-visible versions and add CRC-32 SSTable data block checksums with a VERIFY command that validates all SSTables."
+ },
+ "instruction_head": "Two things this round.\n\nFirst, there's a snapshot bug: if you write a bunch of keys, take a snapshot, write new versions of those keys, and enough flushes happen to trigger the L0-to-L1 compaction, the snapshot starts returning `NOT_FOUND` for keys it should still see. The full compaction path handles this correctly, so it's just the L0 compaction that's dropping versions it shouldn't. Fix that.\n\nSecond, add data block checksums to SSTables. Each data block should be followed by a CRC-32 (IEEE) "
+}

@@ -1,0 +1,880 @@
+[
+ {
+  "round": 1,
+  "root": "/app",
+  "graph": {
+   "n_files": 1,
+   "n_edges": 0,
+   "delta": {
+    "files_added": [
+     "cmd/jobforge/main.go"
+    ],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/jobforge/main.go",
+     "pagerank": 1.0,
+     "fan_in": 0,
+     "fan_out": 0
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/jobforge/main.go"
+   ],
+   "target_symbols": [
+    "main",
+    "plan subcommand handler",
+    "run subcommand handler",
+    "spec loader/validator",
+    "level layering (Kahn-style)",
+    "job executor",
+    "results JSON writer with custom escaping"
+   ],
+   "behavior_constraints": [
+    "Build with `go build -o /usr/local/bin/jobforge ./cmd/jobforge` and invoke as `jobforge <subcommand> --spec <path>`",
+    "Spec is JSON object with `jobs` array; each job has name (required, matches ^[A-Za-z_][A-Za-z0-9_-]*$), command (required), deps (optional, default []), workdir (optional, default /app), env (optional, default {})",
+    "Unknown top-level fields and unknown per-job fields cause rejection; duplicate job names rejected",
+    "Exactly two subcommands: plan and run",
+    "plan --spec <path> [--format json|text] validates and prints Kahn-style level layering; level 0 = no deps, level k = all deps in levels 0..k-1",
+    "Within a level names sorted byte-wise lexicographically (uppercase before lowercase, no locale/case folding)",
+    "plan text format (default): one line per level `level N: a, b, c\\n`; empty spec prints nothing",
+    "plan json format: single line `{\"levels\":[[\"a\"],[\"b\",\"c\"],...]}\\n`; empty spec prints `{\"levels\":[]}\\n`",
+    "Invalid spec: exit 2, nothing on stdout, single line `error: <code>: <message>\\n` on stderr",
+    "run validates, computes same layering, executes jobs one at a time in level then lexicographic order"
+   ],
+   "affected_prior": [],
+   "summary": "Round 1 builds the full jobforge CLI from the stub: spec parsing/strict validation with precedence-ordered error codes, Kahn-style level layering, a plan subcommand with text/json output, and a run subcommand that executes bash jobs with deterministic ordering, stop/continue failure modes, and a results JSON file with precise custom escaping."
+  },
+  "instruction_head": "# jobforge\n\nI want to start building a CLI called `jobforge` that runs a set of named\nshell-command jobs declared in a single JSON spec file. The skeleton in\n`/app` only has a stub; this is where the real behavior lands.\n\nBuild the binary with `go build -o /usr/local/bin/jobforge ./cmd/jobforge`\nand let it be invoked as `jobforge <subcommand> --spec <path>`.\n\n## Spec file format\n\nThe spec is a single JSON object with the field `jobs`, a list of job objects.\nEach job object has these fields:\n\n- `"
+ },
+ {
+  "round": 2,
+  "root": "/app",
+  "graph": {
+   "n_files": 4,
+   "n_edges": 4,
+   "delta": {
+    "files_added": [
+     "cmd/jobforge/cycle.go",
+     "cmd/jobforge/run.go",
+     "cmd/jobforge/spec.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "cmd/jobforge/main.go",
+      "cmd/jobforge/run.go"
+     ],
+     [
+      "cmd/jobforge/main.go",
+      "cmd/jobforge/spec.go"
+     ],
+     [
+      "cmd/jobforge/run.go",
+      "cmd/jobforge/spec.go"
+     ],
+     [
+      "cmd/jobforge/spec.go",
+      "cmd/jobforge/cycle.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/jobforge/cycle.go",
+     "pagerank": 0.390362,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/jobforge/spec.go",
+     "pagerank": 0.317542,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/jobforge/run.go",
+     "pagerank": 0.171644,
+     "fan_in": 1,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/jobforge/main.go",
+     "pagerank": 0.120452,
+     "fan_in": 0,
+     "fan_out": 2
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/jobforge/main.go"
+   ],
+   "target_symbols": [
+    "main",
+    "runValidate",
+    "runList",
+    "formatListText",
+    "formatListJSON",
+    "applyOnlyFilter"
+   ],
+   "behavior_constraints": [
+    "Add read-only validate and list subcommands invoked as `jobforge validate --spec <path>` and `jobforge list --spec <path> [--format json|text] [--only <names>]`.",
+    "validate and list must use the same spec validation function/path as plan and run; invalid specs are classified identically across all subcommands.",
+    "validate on a valid spec exits 0 and writes zero bytes to stdout and zero bytes to stderr.",
+    "validate on an invalid spec exits 2, writes nothing to stdout, and writes exactly one stderr line `error: <code>: <message>` followed by a newline, with code/message/precedence identical to existing validation.",
+    "validate accepts only --spec; any other flag or bare positional argument exits 2 with a non-empty stderr line starting with `error: ` and no stdout.",
+    "list validates the spec first; on invalid spec it exits 2 with stderr-only error and empty stdout, never emitting the --only unknown_dep error before validation.",
+    "list never executes job commands and never reads/writes/consults a working directory on disk.",
+    "list emits jobs in deterministic walk order: ascending level, then byte-wise lexicographic case-sensitive within a level, matching plan/run.",
+    "list --format text default: one line per job ending with a newline, exactly `<name>\\tlevel=<N>\\tworkdir=<workdir>\\tdeps=<deps>\\tenv=<env>` using literal tab characters.",
+    "list level N starts at 0 and equals the job's level in the full spec; workdir is the resolved workdir with default /app applied when omitted."
+   ],
+   "affected_prior": [
+    "main CLI dispatch and argument parsing in cmd/jobforge/main.go",
+    "runPlan and runRun subcommand handlers",
+    "shared validation pipeline: loadSpec, detectCycle, findCyclePath, computeLevels, printValidationError, and existing error codes"
+   ],
+   "summary": "Add read-only validate and list subcommands that reuse the existing validation pipeline and emit strict deterministic spec diagnostics/listings with an --only transitive-dependency filter, without changing plan/run."
+  },
+  "instruction_head": "# jobforge validate and list\n\nAdd two new read-only subcommands: `validate` and `list`. Execution\nsemantics for the existing `plan` and `run` commands are unchanged. The\nbinary is still built with\n`go build -o /usr/local/bin/jobforge ./cmd/jobforge` and invoked as\n`jobforge <subcommand> --spec <path>`.\n\nExisting behavior \u2014 including the validation precedence table, byte-level\nresults file format, globally-lex-smallest multi-SCC cycle path, and\ncase-sensitive byte-wise within-level ordering \u2014 mus"
+ },
+ {
+  "round": 3,
+  "root": "/app",
+  "graph": {
+   "n_files": 4,
+   "n_edges": 4,
+   "delta": {
+    "files_added": [],
+    "files_removed": [],
+    "edges_added": [],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/jobforge/cycle.go",
+     "pagerank": 0.390362,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/jobforge/spec.go",
+     "pagerank": 0.317542,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/jobforge/run.go",
+     "pagerank": 0.171644,
+     "fan_in": 1,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/jobforge/main.go",
+     "pagerank": 0.120452,
+     "fan_in": 0,
+     "fan_out": 2
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/jobforge/main.go"
+   ],
+   "target_symbols": [
+    "main",
+    "runGraph",
+    "renderGraphDOT",
+    "renderGraphMermaid",
+    "addTransitiveDeps",
+    "parseOnlyFilter",
+    "loadSpec"
+   ],
+   "behavior_constraints": [
+    "New `graph` subcommand registered in main, invoked as `jobforge graph --spec <path> [--format dot|mermaid] [--only <names>]`",
+    "Default --format is dot; values other than dot|mermaid cause exit 2 with stderr-only `error: bad --format\\n` and empty stdout",
+    "graph uses the same validation path as plan/run/validate/list: invalid spec exits 2 with stderr-only `error: <code>: <message>\\n` and empty stdout",
+    "Missing --spec exits 2 with non-empty `error: ...` on stderr and empty stdout",
+    "Any unsupported flag (e.g. --results, --on-failure, bare positionals) exits 2 with non-empty `error: ...` on stderr and empty stdout",
+    "graph does not execute any job command and does not touch any working directory on disk",
+    "Nodes emitted in level-major, byte-wise lexicographic within-level (case-sensitive) walk order, matching list",
+    "Edges emitted as `dep -> name` grouped by dependent node in walk order, within each node in spec-declared deps order",
+    "DOT format: line1 `digraph jobforge {`, line2 `\\trankdir=LR;`, then one `\\t\"<name>\" [level=\"<N>\",workdir=\"<workdir>\"];` per job in walk order, then one `\\t\"<dep>\" -> \"<name>\";` per edge, final line `}` with exactly one trailing newline",
+    "DOT attribute order is level then workdir, single comma no spaces; workdir is resolved default `/app` applied when omitted"
+   ],
+   "affected_prior": [
+    "main (subcommand registration)",
+    "shared validation pipeline (loadSpec)",
+    "parseOnlyFilter/addTransitiveDeps (reused for --only)"
+   ],
+   "summary": "Add a read-only `graph` subcommand emitting the DAG in DOT or Mermaid text formats with the same validation, walk order, and --only filter semantics as list, without executing any jobs."
+  },
+  "instruction_head": "# jobforge graph output\n\nAdd a new read-only subcommand, `graph`, that emits the DAG in two\ntextual graph formats (DOT and Mermaid). The binary is still built with\n`go build -o /usr/local/bin/jobforge ./cmd/jobforge` and invoked as\n`jobforge <subcommand> --spec <path>`.\n\nAll existing behavior \u2014 including `plan`, `run`, `validate`,\n`list` (with `--only`), the 11-row validation precedence table, byte-level\nresults file format, globally lex-smallest multi-SCC cycle path,\ncase-sensitive byte-wise wi"
+ },
+ {
+  "round": 4,
+  "root": "/app",
+  "graph": {
+   "n_files": 5,
+   "n_edges": 7,
+   "delta": {
+    "files_added": [
+     "cmd/jobforge/graph.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "cmd/jobforge/graph.go",
+      "cmd/jobforge/main.go"
+     ],
+     [
+      "cmd/jobforge/graph.go",
+      "cmd/jobforge/spec.go"
+     ],
+     [
+      "cmd/jobforge/main.go",
+      "cmd/jobforge/graph.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/jobforge/cycle.go",
+     "pagerank": 0.327207,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/jobforge/spec.go",
+     "pagerank": 0.284214,
+     "fan_in": 3,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/jobforge/main.go",
+     "pagerank": 0.13872,
+     "fan_in": 1,
+     "fan_out": 3
+    },
+    {
+     "file": "cmd/jobforge/graph.go",
+     "pagerank": 0.124929,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/jobforge/run.go",
+     "pagerank": 0.124929,
+     "fan_in": 1,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/jobforge/main.go",
+    "cmd/jobforge/graph.go",
+    "cmd/jobforge/hash.go"
+   ],
+   "target_symbols": [
+    "main",
+    "runHash",
+    "renderDot",
+    "loadSpec"
+   ],
+   "behavior_constraints": [
+    "DOT node attributes must be space-separated with no space around '=': [level=\"<N>\" workdir=\"<workdir>\"];",
+    "hash subcommand validates spec using the same error contract as plan/list: exit 2, stderr-only error, empty stdout on failure",
+    "hash --format short (default) prints first 12 lowercase hex chars of SHA-256 followed by \\n (13 bytes total)",
+    "hash --format long prints full 64 lowercase hex chars of SHA-256 followed by \\n (65 bytes total)",
+    "canonical form: for each job in list walk order, emit <name>\\0<workdir>\\0<command>\\0deps=<d1>,<d2>,...\\0env=<k1>=<v1>,<k2>=<v2>,...\\n with NUL byte delimiters",
+    "deps entries preserve spec-declared order; env entries sorted by key in byte order; keys/values written verbatim with no escaping",
+    "empty deps list produces 'deps=' with nothing after '='; empty env produces 'env=' with nothing after '='",
+    "empty spec ({\"jobs\":[]}) canonical form is empty string, SHA-256 is e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "hash does NOT support --only; passing --only is rejected as unknown flag (exit 2, non-empty stderr)",
+    "--spec missing: exit 2, non-empty error: line on stderr, empty stdout"
+   ],
+   "affected_prior": [
+    "renderDot (DOT attribute separator changed from comma to space)",
+    "main (subcommand dispatch must add hash routing)"
+   ],
+   "summary": "Add a hash subcommand that prints a SHA-256 hash of a NUL-delimited canonicalized spec representation in short or long format, and fix graph --format dot to use space-separated node attributes instead of comma-separated."
+  },
+  "instruction_head": "# jobforge hash and DOT correction\n\nAdd a new subcommand `hash`, and make one targeted correction to\n`graph --format dot` output.\n\nThe binary is still built with\n`go build -o /usr/local/bin/jobforge ./cmd/jobforge` and invoked as\n`jobforge <subcommand> --spec <path>`.\n\nExisting `plan`, `run`, `validate`, and `list` behavior remains unchanged.\nExisting `graph` behavior is kept, except for the one correction noted below.\n\n## Correction to `graph --format dot`\n\nThe DOT emitter currently writes node"
+ },
+ {
+  "round": 5,
+  "root": "/app",
+  "graph": {
+   "n_files": 6,
+   "n_edges": 10,
+   "delta": {
+    "files_added": [
+     "cmd/jobforge/hash.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "cmd/jobforge/hash.go",
+      "cmd/jobforge/main.go"
+     ],
+     [
+      "cmd/jobforge/hash.go",
+      "cmd/jobforge/spec.go"
+     ],
+     [
+      "cmd/jobforge/main.go",
+      "cmd/jobforge/hash.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/jobforge/cycle.go",
+     "pagerank": 0.291351,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/jobforge/spec.go",
+     "pagerank": 0.264796,
+     "fan_in": 4,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/jobforge/main.go",
+     "pagerank": 0.149636,
+     "fan_in": 2,
+     "fan_out": 4
+    },
+    {
+     "file": "cmd/jobforge/graph.go",
+     "pagerank": 0.098072,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/jobforge/hash.go",
+     "pagerank": 0.098072,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/jobforge/run.go",
+     "pagerank": 0.098072,
+     "fan_in": 1,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/jobforge/main.go",
+    "cmd/jobforge/diff.go"
+   ],
+   "target_symbols": [
+    "main",
+    "runDiff",
+    "renderDiff",
+    "formatFieldRepr"
+   ],
+   "behavior_constraints": [
+    "Add a `diff` subcommand accepting `--old <path>` and `--new <path>`, both required",
+    "Validate both specs through the existing validation path with the same error codes as plan/list/hash",
+    "Exit 0 with exactly empty stdout (0 bytes) when the two specs' hash canonical forms are byte-identical",
+    "Exit 1 when specs differ, printing one or more newline-terminated lines in fixed order: added jobs (`+ <name>`), removed jobs (`- <name>`), then changed jobs (`~ <name> <field>: <old_repr> -> <new_repr>`)",
+    "Added jobs listed in walk order of the new spec; removed jobs in walk order of the old spec; changed jobs in walk order of the new spec",
+    "For changed jobs, emit only differing fields, in fixed order: workdir, command, deps, env, level",
+    "Field representations: workdir/command verbatim; deps as `[d1,d2,...]` in spec order, empty `[]`; env as `{k=v,...}` byte-sorted, empty `{}`; level as decimal",
+    "Walk order is the same level-major-then-byte-wise order used by list/hash; levels computed independently per spec",
+    "Exit 2 on flag/positional errors or validation errors, with exactly one `error: ...\\n` line on stderr and empty stdout",
+    "On validation failure, prepend `old: ` or `new: ` to the error payload; report `old` first if both invalid"
+   ],
+   "affected_prior": [
+    "main",
+    "runValidate",
+    "loadSpec",
+    "listJobs walk order",
+    "runHash canonical form"
+   ],
+   "summary": "This round adds a read-only `diff` subcommand that validates two specs, compares their canonical forms, and prints a deterministic line-oriented diff of added/removed/changed jobs with exit codes 0/1/2."
+  },
+  "instruction_head": "# jobforge diff\n\nAdd a new subcommand `diff` that compares two job specs and reports the\nuser-observable changes.\n\nAll existing behavior is unchanged.\n\n## New subcommand: `jobforge diff --old <path> --new <path>`\n\nValidates both specs with the existing validation path (same error\ncodes as `plan`/`list`/`hash`). On success, prints a deterministic\nline-oriented diff of the two specs to stdout and exits with:\n\n- `0` if the two specs are equivalent (no lines printed, exactly 0\n  bytes on stdout)\n- `"
+ },
+ {
+  "round": 6,
+  "root": "/app",
+  "graph": {
+   "n_files": 7,
+   "n_edges": 13,
+   "delta": {
+    "files_added": [
+     "cmd/jobforge/diff.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "cmd/jobforge/diff.go",
+      "cmd/jobforge/hash.go"
+     ],
+     [
+      "cmd/jobforge/diff.go",
+      "cmd/jobforge/spec.go"
+     ],
+     [
+      "cmd/jobforge/main.go",
+      "cmd/jobforge/diff.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/jobforge/cycle.go",
+     "pagerank": 0.270761,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/jobforge/spec.go",
+     "pagerank": 0.254652,
+     "fan_in": 5,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/jobforge/main.go",
+     "pagerank": 0.133702,
+     "fan_in": 2,
+     "fan_out": 5
+    },
+    {
+     "file": "cmd/jobforge/hash.go",
+     "pagerank": 0.109776,
+     "fan_in": 2,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/jobforge/diff.go",
+     "pagerank": 0.077036,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/jobforge/graph.go",
+     "pagerank": 0.077036,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/jobforge/run.go",
+     "pagerank": 0.077036,
+     "fan_in": 1,
+     "fan_out": 1
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/jobforge/main.go",
+    "cmd/jobforge/schedule.go"
+   ],
+   "target_symbols": [
+    "main",
+    "runSchedule",
+    "renderScheduleText",
+    "renderScheduleJSON",
+    "computeSchedule"
+   ],
+   "behavior_constraints": [
+    "Add a `schedule` subcommand dispatched from main alongside existing subcommands without altering their behavior.",
+    "Validate the spec through the existing validation path; invalid spec exits 2 with stderr-only `error: <code>: <message>\n` and empty stdout.",
+    "`--spec` missing exits 2 with non-empty stderr and empty stdout.",
+    "`--workers` missing exits 2 with stderr-only `error: --workers required\n` and empty stdout.",
+    "`--workers` must be a decimal integer >= 1 with no leading +, no leading zeros (e.g. 01), no whitespace, no non-numeric; otherwise exit 2 with stderr-only `error: bad --workers\n` and empty stdout.",
+    "`--format` must be in {text, json}; otherwise exit 2 with stderr-only `error: bad --format\n` and empty stdout.",
+    "`schedule` does NOT support `--only`; passing `--only` or any unknown flag/positional exits 2 with non-empty stderr and empty stdout.",
+    "Compute schedule level-by-level in Kahn level order, byte-wise within each level, with unit-duration jobs (start=earliest, end=start+1).",
+    "earliest is the smallest timestep t such that every dependency has end <= t (0 if no deps); if all workers have busy_until > earliest, pick the worker with smallest busy_until (ties: smallest index) and set earliest = busy_until[w].",
+    "Worker selection iterates 0..N-1 picking first w with busy_until[w] <= earliest; record (name, worker, start, end)."
+   ],
+   "affected_prior": [
+    "main",
+    "loadSpec",
+    "computeLevels"
+   ],
+   "summary": "This round adds a read-only `schedule` subcommand that validates a spec and emits a deterministic level-major byte-wise worker-lane assignment with unit-duration jobs in compact text or JSON form."
+  },
+  "instruction_head": "# jobforge schedule\n\nAdd a new subcommand `schedule` that assigns every job to a worker lane\nso the DAG can be executed in parallel, and emits the schedule as a\nbyte-exact text plan.\n\nAll existing behavior is unchanged.\n\n## New subcommand: `jobforge schedule --spec <path> --workers <N> [--format text|json]`\n\nValidates the spec (same error contract as `plan`/`list`/`hash`/\n`diff`). `N` must be a positive integer `>= 1`. On success, computes\na deterministic assignment of jobs to workers and emits "
+ },
+ {
+  "round": 7,
+  "root": "/app",
+  "graph": {
+   "n_files": 8,
+   "n_edges": 17,
+   "delta": {
+    "files_added": [
+     "cmd/jobforge/schedule.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "cmd/jobforge/main.go",
+      "cmd/jobforge/schedule.go"
+     ],
+     [
+      "cmd/jobforge/schedule.go",
+      "cmd/jobforge/main.go"
+     ],
+     [
+      "cmd/jobforge/schedule.go",
+      "cmd/jobforge/run.go"
+     ],
+     [
+      "cmd/jobforge/schedule.go",
+      "cmd/jobforge/spec.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/jobforge/cycle.go",
+     "pagerank": 0.255466,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/jobforge/spec.go",
+     "pagerank": 0.246556,
+     "fan_in": 6,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/jobforge/main.go",
+     "pagerank": 0.130484,
+     "fan_in": 3,
+     "fan_out": 6
+    },
+    {
+     "file": "cmd/jobforge/hash.go",
+     "pagerank": 0.091739,
+     "fan_in": 2,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/jobforge/run.go",
+     "pagerank": 0.082619,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/jobforge/diff.go",
+     "pagerank": 0.064378,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/jobforge/graph.go",
+     "pagerank": 0.064378,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/jobforge/schedule.go",
+     "pagerank": 0.064378,
+     "fan_in": 1,
+     "fan_out": 3
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/jobforge/main.go",
+    "cmd/jobforge/critical.go"
+   ],
+   "target_symbols": [
+    "main",
+    "runCritical",
+    "computeCriticalPath",
+    "renderCriticalText",
+    "renderCriticalJSON"
+   ],
+   "behavior_constraints": [
+    "Adds a `critical` subcommand accepting `--spec <path>` and optional `--format text|json`.",
+    "Default output format is text.",
+    "Missing `--spec` exits 2 with non-empty `error: ...` on stderr and empty stdout.",
+    "Invalid `--format` value exits 2 with stderr-only `error: bad --format\\n` and empty stdout.",
+    "`--only` is not supported and is rejected as an unknown flag with exit 2.",
+    "Any other unknown flag or positional argument exits 2 with non-empty stderr and empty stdout.",
+    "Invalid spec exits 2 with stderr-only `error: <code>: <message>\\n` using existing validation codes.",
+    "On success, stdout ends with exactly one `\\n` and nothing is written to stderr.",
+    "Computes job length as `length(j)=1+max(length(d) for d in deps(j))`, with `length(j)=1` when deps are empty.",
+    "Critical sink is the job with maximum length; ties broken by byte-order-first job name."
+   ],
+   "affected_prior": [
+    "main command dispatch in cmd/jobforge/main.go"
+   ],
+   "summary": "This round adds a read-only `critical` subcommand that validates a spec and emits the deterministic longest dependency chain in text or JSON form."
+  },
+  "instruction_head": "# jobforge critical path\n\nAdd a new subcommand `critical` that reports the critical path (longest\ndependency chain by job count) of the DAG.\n\nAll existing behavior is unchanged.\n\n## New subcommand: `jobforge critical --spec <path> [--format text|json]`\n\nValidates the spec (same error contract as existing subcommands). On\nsuccess, computes the critical path and emits it.\n\n### Definition of the critical path\n\nEach job has unit weight `1`. For any job `j`, define\n`length(j) = 1 + max(length(d) for "
+ },
+ {
+  "round": 8,
+  "root": "/app",
+  "graph": {
+   "n_files": 9,
+   "n_edges": 20,
+   "delta": {
+    "files_added": [
+     "cmd/jobforge/critical.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "cmd/jobforge/critical.go",
+      "cmd/jobforge/main.go"
+     ],
+     [
+      "cmd/jobforge/critical.go",
+      "cmd/jobforge/spec.go"
+     ],
+     [
+      "cmd/jobforge/main.go",
+      "cmd/jobforge/critical.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/jobforge/cycle.go",
+     "pagerank": 0.243716,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/jobforge/spec.go",
+     "pagerank": 0.240038,
+     "fan_in": 7,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/jobforge/main.go",
+     "pagerank": 0.137789,
+     "fan_in": 4,
+     "fan_out": 7
+    },
+    {
+     "file": "cmd/jobforge/hash.go",
+     "pagerank": 0.080393,
+     "fan_in": 2,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/jobforge/run.go",
+     "pagerank": 0.0724,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/jobforge/critical.go",
+     "pagerank": 0.056416,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/jobforge/diff.go",
+     "pagerank": 0.056416,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/jobforge/graph.go",
+     "pagerank": 0.056416,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/jobforge/schedule.go",
+     "pagerank": 0.056416,
+     "fan_in": 1,
+     "fan_out": 3
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/jobforge/main.go",
+    "cmd/jobforge/ancestors.go"
+   ],
+   "target_symbols": [
+    "main",
+    "runPlan",
+    "renderPlanText",
+    "runAncestors",
+    "computeAncestors",
+    "renderAncestorsText",
+    "renderAncestorsJSON",
+    "addTransitiveDeps"
+   ],
+   "behavior_constraints": [
+    "plan --format text now emits lines as `L<N> [<names joined by \", \">]` with `]\\n` terminator; no space between L and level number",
+    "plan text output skips empty levels; empty spec yields zero stdout bytes",
+    "plan --format json output is unchanged",
+    "new ancestors subcommand validates spec using existing validation pipeline and error codes",
+    "ancestors --format text (default): prints ancestors in level-major byte-wise order, one per line `\\n`-terminated; no ancestors yields zero bytes on stdout",
+    "ancestors --format json: compact JSON array of ancestor strings in level-major byte-wise order followed by single trailing `\\n`; empty case is `[]\\n`",
+    "ancestors computes transitive ancestors (jobs the target depends on, excluding the target itself) via deps edges",
+    "ancestors does not support --only; unknown flags or positional args cause exit 2 with non-empty stderr and empty stdout",
+    "--spec missing \u2192 exit 2, stderr `error: ...`, empty stdout",
+    "--job missing \u2192 exit 2, stderr `error: --job required\\n`, empty stdout"
+   ],
+   "affected_prior": [
+    "plan --format text output (breaking change to prior text rendering)",
+    "main dispatch table (new ancestors subcommand registration)"
+   ],
+   "summary": "This round rewrites plan's text output to the `L<N> [names]` format and adds a read-only ancestors subcommand that reports transitive ancestor jobs of a target job in text or JSON form."
+  },
+  "instruction_head": "# jobforge plan text and ancestors\n\nChange `jobforge plan`'s text output and add a new subcommand\n`ancestors`.\n\n## Breaking change to `plan --format text`\n\nThe current `plan` text output (default format, or `--format text`) is:\n\n```\nlevel 0: <names joined by \", \">\nlevel 1: <names joined by \", \">\n...\n```\n\nThe text output must now use the new format:\n\n```\nL0 [<names joined by \", \">]\nL1 [<names joined by \", \">]\n...\n```\n\nSpecifically:\n\n- The literal prefix changes from `level <N>: ` to `L<N> [`, wit"
+ },
+ {
+  "round": 9,
+  "root": "/app",
+  "graph": {
+   "n_files": 10,
+   "n_edges": 23,
+   "delta": {
+    "files_added": [
+     "cmd/jobforge/ancestors.go"
+    ],
+    "files_removed": [],
+    "edges_added": [
+     [
+      "cmd/jobforge/ancestors.go",
+      "cmd/jobforge/main.go"
+     ],
+     [
+      "cmd/jobforge/ancestors.go",
+      "cmd/jobforge/spec.go"
+     ],
+     [
+      "cmd/jobforge/main.go",
+      "cmd/jobforge/ancestors.go"
+     ]
+    ],
+    "edges_removed": []
+   },
+   "top10": [
+    {
+     "file": "cmd/jobforge/spec.go",
+     "pagerank": 0.234904,
+     "fan_in": 8,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/jobforge/cycle.go",
+     "pagerank": 0.23461,
+     "fan_in": 1,
+     "fan_out": 0
+    },
+    {
+     "file": "cmd/jobforge/main.go",
+     "pagerank": 0.143563,
+     "fan_in": 5,
+     "fan_out": 8
+    },
+    {
+     "file": "cmd/jobforge/hash.go",
+     "pagerank": 0.071528,
+     "fan_in": 2,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/jobforge/run.go",
+     "pagerank": 0.064417,
+     "fan_in": 2,
+     "fan_out": 1
+    },
+    {
+     "file": "cmd/jobforge/ancestors.go",
+     "pagerank": 0.050195,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/jobforge/critical.go",
+     "pagerank": 0.050195,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/jobforge/diff.go",
+     "pagerank": 0.050195,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/jobforge/graph.go",
+     "pagerank": 0.050195,
+     "fan_in": 1,
+     "fan_out": 2
+    },
+    {
+     "file": "cmd/jobforge/schedule.go",
+     "pagerank": 0.050195,
+     "fan_in": 1,
+     "fan_out": 3
+    }
+   ]
+  },
+  "entities": {
+   "source": "llm",
+   "target_files": [
+    "cmd/jobforge/impact.go",
+    "cmd/jobforge/main.go"
+   ],
+   "target_symbols": [
+    "main",
+    "runImpact",
+    "computeDescendantSet",
+    "renderImpactText",
+    "renderImpactJSON"
+   ],
+   "behavior_constraints": [
+    "Add a read-only `impact` subcommand that reports transitive descendants of `--job` through `deps`.",
+    "Descendants are jobs with a non-empty dependency path back to the target; the target itself is not included.",
+    "Default `--format text` emits descendants one per line in level-major byte-wise order, each `\\n`-terminated; no descendants emits zero stdout bytes.",
+    "`--format json` emits a compact JSON array of descendant names in level-major byte-wise order followed by one `\\n`; no descendants emits `[]\\n`.",
+    "`--spec` missing exits 2 with non-empty stderr `error: ...` and empty stdout.",
+    "`--job` missing exits 2 with stderr `error: --job required\\n` and empty stdout.",
+    "`--job` not in spec exits 2 with stderr `error: unknown_job: <name>\\n` and empty stdout.",
+    "Invalid `--format` exits 2 with stderr `error: bad --format\\n` and empty stdout.",
+    "`impact` must not support `--only`; any other flag or positional argument exits 2 with non-empty stderr and empty stdout.",
+    "Invalid spec exits 2 with stderr `error: <code>: <message>\\n` using existing validation codes."
+   ],
+   "affected_prior": [
+    "main"
+   ],
+   "summary": "Add a read-only `impact` subcommand that validates a spec and prints the transitive descendants of a target job in text or JSON with the same error and walk-order semantics as other read-only subcommands."
+  },
+  "instruction_head": "# jobforge impact\n\nAdd a new subcommand `impact` that reports the transitive **descendants**\nof a given job \u2014 i.e., the set of jobs that transitively depend on the\ntarget through `deps`.\n\nAll existing behavior is unchanged.\n\n## New subcommand: `jobforge impact --spec <path> --job <name> [--format text|json]`\n\nValidates the spec (same error contract as the other subcommands).\nReports the **transitive descendants** of the target job `--job <name>`\n\u2014 i.e., the set of jobs `y` for which there is a n"
+ }
+]

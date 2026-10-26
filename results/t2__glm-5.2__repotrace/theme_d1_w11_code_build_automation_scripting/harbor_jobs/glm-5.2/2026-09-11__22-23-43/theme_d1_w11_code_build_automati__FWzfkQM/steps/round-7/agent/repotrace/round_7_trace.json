@@ -1,0 +1,130 @@
+{
+ "round": 7,
+ "root": "/app",
+ "graph": {
+  "n_files": 23,
+  "n_edges": 24,
+  "delta": {
+   "files_added": [
+    "lib/journal.sh"
+   ],
+   "files_removed": [],
+   "edges_added": [
+    [
+     "lib/builder.sh",
+     "lib/journal.sh"
+    ],
+    [
+     "lib/journal.sh",
+     "lib/common.sh"
+    ],
+    [
+     "tests/run_tests.sh",
+     "lib/journal.sh"
+    ]
+   ],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "lib/common.sh",
+    "pagerank": 0.35857,
+    "fan_in": 8,
+    "fan_out": 1
+   },
+   {
+    "file": "lib/manifest.sh",
+    "pagerank": 0.348682,
+    "fan_in": 7,
+    "fan_out": 1
+   },
+   {
+    "file": "lib/depgraph.sh",
+    "pagerank": 0.02616,
+    "fan_in": 3,
+    "fan_out": 2
+   },
+   {
+    "file": "lib/cache.sh",
+    "pagerank": 0.022101,
+    "fan_in": 3,
+    "fan_out": 2
+   },
+   {
+    "file": "lib/journal.sh",
+    "pagerank": 0.016767,
+    "fan_in": 2,
+    "fan_out": 1
+   },
+   {
+    "file": "lib/builder.sh",
+    "pagerank": 0.014331,
+    "fan_in": 1,
+    "fan_out": 5
+   },
+   {
+    "file": "lib/artifact.sh",
+    "pagerank": 0.012552,
+    "fan_in": 0,
+    "fan_out": 2
+   },
+   {
+    "file": "lib/configgen.sh",
+    "pagerank": 0.012552,
+    "fan_in": 0,
+    "fan_out": 2
+   },
+   {
+    "file": "lib/reporter.sh",
+    "pagerank": 0.012552,
+    "fan_in": 0,
+    "fan_out": 2
+   },
+   {
+    "file": "packages/libbase/src/base.c",
+    "pagerank": 0.012552,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "lib/cache.sh",
+   "lib/journal.sh",
+   "lib/builder.sh"
+  ],
+  "target_symbols": [
+   "compute_source_hash",
+   "get_src_hash",
+   "update_cache",
+   "_stored_dep_hash",
+   "journal_append_event",
+   "journal_file",
+   "build_changed_packages"
+  ],
+  "behavior_constraints": [
+   "Source hash computation must include the selected build profile name as an additional input to the SHA256 hash",
+   "get_src_hash PACKAGE [PROFILE] must be supported by the cache helper API and default to the existing default profile when PROFILE is omitted",
+   "Profile-specific cache stamps must never be compared against a profile-agnostic content hash; switching profiles forces rehash/rebuild",
+   "All journal appends must acquire an exclusive flock on .forge_journal/.lock, write the JSON line, then release the lock",
+   "Journal writes must be correct and lossless under -j 4 parallelism (no interleaved or dropped events)",
+   "forge journal | wc -l after a parallel --all build with -j 4 must yield at least 2 events per built package (start+complete)",
+   "When updating a package cache stamp after a successful build, record the CURRENT source hashes of all transitive dependencies (post-rebuild state), not the pre-build hashes",
+   "Cache stamp update for a dependent must occur only after its dependencies have been rebuilt and their stamps updated",
+   "After forge build --changed rebuilds a changed package and its dependents, forge cache status must report all rebuilt packages as cached (not stale)",
+   "Existing behavior for non-parallel, single-profile, and unchanged-source cases must be preserved"
+  ],
+  "affected_prior": [
+   "compute_source_hash",
+   "update_cache",
+   "is_cache_valid",
+   "_stored_dep_hash",
+   "journal_append_event",
+   "build_changed_packages"
+  ],
+  "summary": "Fix content-hash cache to be profile-aware in source hash computation, serialize journal appends with flock under parallel builds, and ensure --changed rebuilds record current transitive dependency hashes in cache stamps so dependents are not reported stale."
+ },
+ "instruction_head": "# Round 7: Cache and Journal Correctness Fixes\n\nThree bugs have been reported against the content-hash cache and the build journal.\n\n## Bug 1: Content Hash Ignores Build Profile\n\n**Steps to reproduce:**\n```bash\nforge build --all --profile release     # builds with -O2 -DNDEBUG -s\nforge build --all --profile debug       # builds with -g -O0 -DDEBUG\nforge cache status --package libbase --profile debug\n                                        # expected: debug has its own cache state\n               "
+}

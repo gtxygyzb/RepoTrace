@@ -1,0 +1,120 @@
+{
+ "round": 13,
+ "root": "/app",
+ "graph": {
+  "n_files": 11,
+  "n_edges": 45,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "commands_extra.go",
+    "pagerank": 0.170551,
+    "fan_in": 9,
+    "fan_out": 6
+   },
+   {
+    "file": "main.go",
+    "pagerank": 0.167446,
+    "fan_in": 8,
+    "fan_out": 9
+   },
+   {
+    "file": "format.go",
+    "pagerank": 0.141949,
+    "fan_in": 8,
+    "fan_out": 0
+   },
+   {
+    "file": "registry.go",
+    "pagerank": 0.105217,
+    "fan_in": 6,
+    "fan_out": 4
+   },
+   {
+    "file": "checkpoints.go",
+    "pagerank": 0.086939,
+    "fan_in": 3,
+    "fan_out": 2
+   },
+   {
+    "file": "inference.go",
+    "pagerank": 0.083827,
+    "fan_in": 4,
+    "fan_out": 4
+   },
+   {
+    "file": "export_import.go",
+    "pagerank": 0.064581,
+    "fan_in": 2,
+    "fan_out": 4
+   },
+   {
+    "file": "validate_input.go",
+    "pagerank": 0.058233,
+    "fan_in": 2,
+    "fan_out": 4
+   },
+   {
+    "file": "commands.go",
+    "pagerank": 0.040419,
+    "fan_in": 1,
+    "fan_out": 3
+   },
+   {
+    "file": "ensemble.go",
+    "pagerank": 0.040419,
+    "fan_in": 1,
+    "fan_out": 5
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "format.go",
+   "main.go",
+   "commands_extra.go",
+   "migration.go"
+  ],
+  "target_symbols": [
+   "loadWeights",
+   "writeWeights",
+   "saveModelMeta",
+   "loadModelMeta",
+   "cmdUpgrade",
+   "cmdVerify",
+   "parseFlags",
+   "printUsage",
+   "main"
+  ],
+  "behavior_constraints": [
+   "v3 weight binary format appends a uint32 CRC32 checksum after all weights and biases",
+   "loadWeights for v3 reads trailing uint32 as CRC32 and verifies it matches CRC32 of all preceding bytes; on failure returns error 'checksum mismatch'",
+   "loadWeights still handles v1 and v2 files (no checksum, backward compatible)",
+   "writeWeights appends CRC32 checksum only when writing version >= 3; omits it for version < 3",
+   "upgrade command on already-v3 model reports 'already at latest version'",
+   "upgrade v1->v3 adds activation=none and checksum, creates backup weights.bin.v1bak",
+   "upgrade v2->v3 adds checksum, creates backup weights.bin.v2bak",
+   "upgrade updates model.meta format_version field to 3",
+   "verify checks weights.bin exists and is readable; for v3 verifies CRC32; for v1/v2 verifies file is parseable",
+   "verify reports 'model '<name>' integrity: OK' on success or 'model '<name>' integrity: FAILED (<reason>)' on failure"
+  ],
+  "affected_prior": [
+   "loadWeights",
+   "writeWeights",
+   "saveModelMeta",
+   "loadModelMeta",
+   "cmdPrune",
+   "cmdExport",
+   "cmdImport",
+   "cmdEnsembleRun"
+  ],
+  "summary": "This round upgrades the binary weight format to v3 with a trailing CRC32 integrity checksum in loadWeights/writeWeights and adds 'upgrade' and 'verify' commands for model format migration and health checking."
+ },
+ "instruction_head": "**Conflict + Extension**: The binary weight format gets a v3 upgrade with an integrity checksum, and a model health-check command is added.\n\n**Conflict - Format v3:**\nThe weight binary format adds a CRC32 checksum at the END of the file (after all weights and biases):\n```\n[existing v2 layout...]\nbias        float64[num_outputs]\nchecksum    uint32 (CRC32 of all preceding bytes)\n```\n\nThe version field becomes 3. The `loadWeights` function must:\n- Still handle v1 and v2 files (no checksum)\n- For v3"
+}

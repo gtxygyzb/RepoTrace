@@ -1,0 +1,52 @@
+{
+ "round": 5,
+ "root": "/app",
+ "graph": {
+  "n_files": 1,
+  "n_edges": 0,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "nlsolve.c",
+    "pagerank": 1.0,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "nlsolve.c"
+  ],
+  "target_symbols": [
+   "solve_cg",
+   "solve_bicgstab",
+   "ic0_factorize",
+   "precond_setup",
+   "main"
+  ],
+  "behavior_constraints": [
+   "CG detecting pAp <= 0 must stop iterating and emit the standard output block (solver, preconditioner, dimension, reordering, iterations so far, residual_norm as true residual of partial x, converged: no, and all x[i]) with empty stderr and exit code 0",
+   "BiCGSTAB breakdown (rho near zero or denominator near zero) must stop iterating and emit the standard output block with converged: no and all partial x[i], empty stderr, exit code 0",
+   "IC(0) encountering a non-positive diagonal pivot must discard the incomplete factor, fall back to no preconditioner, run the solver with preconditioner: none, and report preconditioner: none in output, with empty stderr and exit code 0",
+   "IC(0) fallback applies to CG, BiCGSTAB, and GMRES, including runs that use reordering",
+   "--history output up to the breakdown/detection point remains unchanged",
+   "All input/CLI validation errors continue to exit non-zero with `error:` on stderr and empty stdout"
+  ],
+  "affected_prior": [
+   "solve_cg",
+   "solve_bicgstab",
+   "ic0_factorize",
+   "precond_setup",
+   "main"
+  ],
+  "summary": "This round converts numerical failure paths (CG non-PD, BiCGSTAB breakdown, IC0 non-positive pivot) from process-aborting errors into graceful partial-output or fallback-to-none behaviors with exit code 0 and empty stderr, while leaving input validation errors unchanged."
+ },
+ "instruction_head": "Code review determined that aborting the process on numerical errors was the wrong design choice. Numerical issues during solving (non-positive-definite detection, BiCGSTAB breakdown) should produce a partial result rather than terminating with only an error message. Input validation errors remain unchanged.\n\n1. **CG non-positive-definite detection must produce partial output instead of exiting.** When CG detects `pAp <= 0`, it must stop iterating and output the current partial solution with the"
+}

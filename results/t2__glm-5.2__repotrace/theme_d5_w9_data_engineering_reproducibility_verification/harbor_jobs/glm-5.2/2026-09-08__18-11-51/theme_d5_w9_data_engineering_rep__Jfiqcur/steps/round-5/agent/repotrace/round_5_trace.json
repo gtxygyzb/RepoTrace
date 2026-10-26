@@ -1,0 +1,113 @@
+{
+ "round": 5,
+ "root": "/app",
+ "graph": {
+  "n_files": 9,
+  "n_edges": 14,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "csvio.go",
+    "pagerank": 0.327611,
+    "fan_in": 6,
+    "fan_out": 0
+   },
+   {
+    "file": "jsonutil.go",
+    "pagerank": 0.130064,
+    "fan_in": 2,
+    "fan_out": 1
+   },
+   {
+    "file": "compare.go",
+    "pagerank": 0.096273,
+    "fan_in": 2,
+    "fan_out": 2
+   },
+   {
+    "file": "profile.go",
+    "pagerank": 0.096273,
+    "fan_in": 2,
+    "fan_out": 3
+   },
+   {
+    "file": "stats.go",
+    "pagerank": 0.089148,
+    "fan_in": 1,
+    "fan_out": 0
+   },
+   {
+    "file": "pipeline.go",
+    "pagerank": 0.075018,
+    "fan_in": 1,
+    "fan_out": 3
+   },
+   {
+    "file": "expr.go",
+    "pagerank": 0.061871,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "main.go",
+    "pagerank": 0.061871,
+    "fan_in": 0,
+    "fan_out": 4
+   },
+   {
+    "file": "schema.go",
+    "pagerank": 0.061871,
+    "fan_in": 0,
+    "fan_out": 1
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "main.go",
+   "csvio.go",
+   "pipeline.go",
+   "lineage.go"
+  ],
+  "target_symbols": [
+   "main",
+   "ComputeFileHash",
+   "WriteCSVWithChecksum",
+   "runPipeline",
+   "cmdLineage",
+   "runLineage",
+   "cmdVerify",
+   "cmdManifest",
+   "runIngest",
+   "runTransform"
+  ],
+  "behavior_constraints": [
+   "verify command validates file against BLAKE2b-256 hex digest (64 lowercase hex chars) read from --checksum file",
+   "manifest command produces BLAKE2b-256 checksums instead of SHA256",
+   "ingest command no longer writes <output>.sha256 sidecar files and removes any pre-existing <output>.sha256",
+   "transform command no longer writes <output>.sha256 sidecar files and removes any pre-existing <output>.sha256",
+   "lineage command reads pipeline config and emits a DAG JSON report without executing the pipeline",
+   "lineage report contains nodes (sorted by id lexicographically), edges (sorted by step then from), and steps (sorted by index)",
+   "each node has id, type='file', produced_by (1-based step index or null)",
+   "each edge has from, to, step (1-based); steps with no output produce no edges",
+   "each step has index, type, inputs array, output (string or null)",
+   "lineage step-type mapping: ingest(file->output), transform(input+recipe->output), profile(input->output), compare(left+right->output), manifest(dir->output), verify(file+checksum, no output), validate(input+schema->output), drift(baseline+current->output)"
+  ],
+  "affected_prior": [
+   "ComputeFileHash/WriteCSVWithChecksum in csvio.go (SHA256->BLAKE2b-256)",
+   "ingest command from round 1 (sidecar removal)",
+   "transform command from round 1 (sidecar removal)",
+   "manifest command (checksum algorithm)",
+   "verify command (checksum algorithm)",
+   "pipeline command from round 1 (new step type)"
+  ],
+  "summary": "Switch checksum hashing from SHA256 to BLAKE2b-256 across manifest/verify while removing sidecar hash files from ingest/transform, and add a new lineage command (plus pipeline lineage step) that emits a file-dependency DAG JSON report."
+ },
+ "instruction_head": "Add the following capabilities to `dpipe` and apply the specified behavior change.\n\n## Behavior Change: verify command checksum algorithm\n\nThe `verify` command previously used SHA256 for computing file checksums. It now uses **BLAKE2b-256** instead.\n\n- The `verify` command still reads the checksum file passed with `--checksum` and compares it against the digest of the file passed with `--file`.\n- Checksums in manifest files must now be BLAKE2b-256 hex digests (64 lowercase hex characters).\n- The"
+}

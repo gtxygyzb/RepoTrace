@@ -1,0 +1,87 @@
+{
+ "round": 7,
+ "root": "/app",
+ "graph": {
+  "n_files": 5,
+  "n_edges": 5,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "helpers.go",
+    "pagerank": 0.431417,
+    "fan_in": 3,
+    "fan_out": 0
+   },
+   {
+    "file": "main.go",
+    "pagerank": 0.159784,
+    "fan_in": 1,
+    "fan_out": 1
+   },
+   {
+    "file": "manifest.go",
+    "pagerank": 0.159784,
+    "fan_in": 1,
+    "fan_out": 1
+   },
+   {
+    "file": "cli.go",
+    "pagerank": 0.124507,
+    "fan_in": 0,
+    "fan_out": 3
+   },
+   {
+    "file": "types.go",
+    "pagerank": 0.124507,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "main.go",
+   "cli.go",
+   "types.go"
+  ],
+  "target_symbols": [
+   "parseArgs",
+   "nextArg",
+   "run",
+   "ingest",
+   "loadState",
+   "saveState",
+   "buildAuditDigest",
+   "writeAuditLog",
+   "State",
+   "PendingPurchase",
+   "marshalLateAuditRecord"
+  ],
+  "behavior_constraints": [
+   "Adding --strict-late-audit takes no value; passing --strict-late-audit=true is a usage error with exit 2",
+   "Supplying --strict-late-audit without --audit-log emits exactly 'ingest: --strict-late-audit requires --audit-log' on stderr and exits 2 with no output files created",
+   "Every late audit record's cutoff MUST be a JSON object with exactly two keys in order: {\"value\": \"<YYYY-MM-DDTHH:MM:SSZ>\", \"epoch_seconds\": <int>}",
+   "cutoff.value must be 20-char strict RFC3339 UTC with Z suffix matching ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+   "cutoff.epoch_seconds is a bare JSON integer equal to Unix seconds for value; negative computed epoch clamps to {\"1970-01-01T00:00:00Z\", 0}",
+   "When --strict-late-audit is supplied, every late audit record gains watermark_lag_seconds (int, run-wide --watermark-lag value) and late_by_seconds (int, cutoff_epoch - event_ts_epoch, always positive) appended immediately after cutoff in that order",
+   "late record has 9 keys under --strict-late-audit in exact order: id, ts, type, shard, line, bucket, cutoff, watermark_lag_seconds, late_by_seconds",
+   "Without --strict-late-audit, late record has 7 keys with structured cutoff but no watermark_lag_seconds/late_by_seconds",
+   "--audit-log-digest emits new top-level block late_cutoff_stats positioned immediately after duplicate_reasons and immediately before resolved_against, always emitted regardless of flag or presence of late records",
+   "late_cutoff_stats has count, min_cutoff_epoch, max_cutoff_epoch as bare JSON integers; when count==0, min and max are 0"
+  ],
+  "affected_prior": [
+   "audit-log feature (round 3 late cutoff rendering)",
+   "manifest (round 5 state/audit_log/audit_digest entries)",
+   "state schema (round 2 pending_purchases)",
+   "dedup-policy feature (round 6)"
+  ],
+  "summary": "This round restructures every late audit record's cutoff into a {value, epoch_seconds} object, adds --strict-late-audit to expose watermark_lag_seconds and late_by_seconds, adds late_cutoff_stats to the audit digest, and (per intro) introduces --audit-log-rotate-bytes and --state-strict plus first_seen_epoch on pending_purchases."
+ },
+ "instruction_head": "# Structured Late Audit Cutoffs and Audit Log Rotation\n\nLate audit records need to carry enough information for downstream tools to\nreconstruct the watermark decision without guessing how a timestamp string was\nformatted. The `cutoff` value in every `late` audit record is now a structured\nJSON object with exactly two keys in this order:\n`{\"value\": \"<RFC3339-UTC-Z>\", \"epoch_seconds\": <int>}`. The `value` field is\nthe canonical UTC string matching the event timestamp format, and\n`epoch_seconds` is"
+}

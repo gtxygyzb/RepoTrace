@@ -1,0 +1,132 @@
+{
+ "round": 2,
+ "root": "/app",
+ "graph": {
+  "n_files": 12,
+  "n_edges": 8,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "src/lexer.c",
+    "pagerank": 0.179375,
+    "fan_in": 3,
+    "fan_out": 0
+   },
+   {
+    "file": "src/ast.c",
+    "pagerank": 0.112356,
+    "fan_in": 2,
+    "fan_out": 0
+   },
+   {
+    "file": "src/codegen.c",
+    "pagerank": 0.078846,
+    "fan_in": 1,
+    "fan_out": 1
+   },
+   {
+    "file": "src/parser.c",
+    "pagerank": 0.078846,
+    "fan_in": 1,
+    "fan_out": 2
+   },
+   {
+    "file": "src/vm.c",
+    "pagerank": 0.078846,
+    "fan_in": 1,
+    "fan_out": 0
+   },
+   {
+    "file": "src/ast.h",
+    "pagerank": 0.06739,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "src/codegen.h",
+    "pagerank": 0.06739,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "src/common.h",
+    "pagerank": 0.06739,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "src/lexer.h",
+    "pagerank": 0.06739,
+    "fan_in": 0,
+    "fan_out": 0
+   },
+   {
+    "file": "src/main.c",
+    "pagerank": 0.06739,
+    "fan_in": 0,
+    "fan_out": 5
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "src/parser.c",
+   "src/ast.c",
+   "src/ast.h",
+   "src/codegen.c",
+   "src/vm.c",
+   "src/vm.h",
+   "src/common.h"
+  ],
+  "target_symbols": [
+   "parse_logic_and",
+   "parse_primary",
+   "parse_factor",
+   "try_parse_assign",
+   "compile_node",
+   "compile_expr",
+   "emit",
+   "compile_store",
+   "resolve_local",
+   "add_local",
+   "find_function",
+   "vm_run",
+   "vm_init",
+   "make_int",
+   "make_str",
+   "make_bool",
+   "value_truthy",
+   "print_value",
+   "ast_alloc",
+   "nodelist_push"
+  ],
+  "behavior_constraints": [
+   "&& evaluates left operand first; if falsy, right operand is not evaluated and result is the left (falsy) value",
+   "|| evaluates left operand first; if truthy, right operand is not evaluated and result is the left (truthy) value",
+   "Side effects (function calls, prints, indexing) in the unevaluated operand of && or || do not occur",
+   "fn appearing in expression position produces a closure value",
+   "fn followed by a name at statement position continues to define a named function as before",
+   "Closures capture variables from enclosing scope by value at creation time",
+   "Mutations to captured non-array variables in outer scope after closure creation do not affect the closure's copy",
+   "Mutations to captured non-array variables inside the closure do not affect the outer scope",
+   "Multiple closures created in the same scope each get independent copies of captured values",
+   "Closures are callable via name(args) syntax identical to named function calls"
+  ],
+  "affected_prior": [
+   "parse_logic_and (round 1 precedence work \u2014 must now short-circuit)",
+   "logical operator codegen/VM opcodes (currently evaluate both operands)",
+   "try_parse_assign (round 1 compound assignments \u2014 must handle index assignment target)",
+   "fn statement parsing (must disambiguate fn-as-statement from fn-as-expression)",
+   "array index read path (codegen/VM \u2014 must be extended to support store)",
+   "named function call mechanism (must also resolve closure values)"
+  ],
+  "summary": "This round fixes && and || to short-circuit, adds first-class closure values via fn expressions with by-value capture (arrays by reference), and adds array mutation via index assignment plus len and push builtins."
+ },
+ "instruction_head": "Two issues need addressing in the Mini compiler.\n\n**Bug \u2014 logical operators don't short-circuit.** Currently `&&` and `||` always evaluate both operands. This breaks programs that rely on the left operand guarding the right:\n\n```\nlet arr = [10, 20, 30];\nlet i = 5;\nif (i < len(arr) && arr[i] > 0) {   // should not index arr[5]\n    print 1;\n}\nprint \"ok\";\n```\n\nThe above crashes with \"index out of bounds\" because `arr[i]` is evaluated even when `i < len(arr)` is false. Fix `&&` so that if the left o"
+}

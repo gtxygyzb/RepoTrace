@@ -1,0 +1,29 @@
+========================================================================
+[RepoTrace] Repository guidance for the current request (round 1)
+The notes below summarize structural centrality and cross-round state.
+They are supplemental context — use your own judgment to implement.
+========================================================================
+
+## Structural centrality
+  (no file is depended on by multiple others)
+
+## Cross-round state
+Already present (from prior rounds):
+New in this round (to be created):
+  - cmd/meshd/main.go
+  - cmd/meshctl/main.go
+  - internal/config/config.go
+  - internal/health/monitor.go
+  - internal/circuit/breaker.go
+  - internal/router/router.go
+  - internal/ipc/server.go
+  - internal/stats/stats.go
+  - internal/state/state.go
+  - go.mod
+
+## Verification
+  - Build and run tests after modification.
+
+## Practical note
+  The terminal can hang on very large heredocs. Write files in several smaller pieces.
+========================================================================

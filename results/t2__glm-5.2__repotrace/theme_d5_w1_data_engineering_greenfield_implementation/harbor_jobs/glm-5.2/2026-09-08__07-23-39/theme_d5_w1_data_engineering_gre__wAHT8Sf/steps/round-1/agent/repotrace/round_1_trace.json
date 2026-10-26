@@ -1,0 +1,52 @@
+{
+ "round": 1,
+ "root": "/app",
+ "graph": {
+  "n_files": 0,
+  "n_edges": 0,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": []
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "go.mod",
+   "main.go"
+  ],
+  "target_symbols": [
+   "main",
+   "ingest",
+   "query",
+   "loadRates",
+   "enumerateShards",
+   "buildArrivalStream",
+   "validateEvent",
+   "applyWatermark",
+   "dedup",
+   "resolveChargebacks",
+   "aggregate",
+   "writeSummary",
+   "writeRejects"
+  ],
+  "behavior_constraints": [
+   "Builds offline into a single executable at /app/eventq using only Go stdlib or vendored modules",
+   "ingest subcommand requires --input-dir, --rates, --output, --rejects, --session-gap, --watermark-lag; missing/empty/out-of-range (--session-gap<=0, --watermark-lag<0) exits 2 with 'error: ingest requires --input-dir, --rates, --output, --rejects, --session-gap, --watermark-lag'",
+   "FX file is validated before any event is read; failures exit 2 with exact messages 'error: fx base must be USD', 'error: fx days invalid', 'error: fx rates must include USD=1.0', 'error: fx rates must be positive finite' and must not create/overwrite --output or --rejects",
+   "A shard is counted only if it is a regular file (no symlinks of any kind), name ends with .ndjson, and does not begin with '.'; all other entries ignored",
+   "Shards are sorted by bare filename ascending; each shard's non-blank lines are concatenated in original order into the arrival stream with (shard_name, line_index) metadata",
+   "Blank/whitespace-only lines are ignored, not rejected",
+   "Schema v1 and v2 are validated per field rules; unknown fields silently dropped; mixing v1/v2 fields is invalid; bad JSON (incl NaN/Infinity) is rejected",
+   "Amount rules: v1 amount required for purchase/refund and absent for signup/login/chargeback; v2 amount_cents non-negative integer required for purchase/refund and absent otherwise; negative/non-finite amounts invalid",
+   "currency required on purchase/refund and absent otherwise; must exist in the event's UTC date rate map or event is rejected (non-fatal)",
+   "ts must be RFC3339 UTC form YYYY-MM-DDTHH:MM:SSZ with no offsets or fractional seconds"
+  ],
+  "affected_prior": [],
+  "summary": "Round 1 demands implementing the eventq CLI from scratch in Go (stdlib only, offline build) with ingest and query subcommands that validate FX, enumerate/merge NDJSON shards, apply watermark/dedup/chargeback rules, and produce deterministic JSON summary plus rejects."
+ },
+ "instruction_head": "# Event Ingestion CLI \u2014 `eventq`\n\nWe are building a data-engineering command-line tool that turns raw event logs into clean, currency-normalized summaries. Please implement it from scratch in Go under `/app`. The tool must build into a single executable at `/app/eventq`. The build must be offline (the container has no network at solve time); either vendor your modules or use only the Go standard library. The environment already has Go 1.22.\n\nThe overall shape is an `ingest` subcommand that reads"
+}

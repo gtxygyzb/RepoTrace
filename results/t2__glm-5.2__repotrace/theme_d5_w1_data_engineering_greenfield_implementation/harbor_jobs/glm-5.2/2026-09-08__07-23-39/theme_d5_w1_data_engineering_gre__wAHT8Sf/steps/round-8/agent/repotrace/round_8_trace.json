@@ -1,0 +1,91 @@
+{
+ "round": 8,
+ "root": "/app",
+ "graph": {
+  "n_files": 5,
+  "n_edges": 5,
+  "delta": {
+   "files_added": [],
+   "files_removed": [],
+   "edges_added": [],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "helpers.go",
+    "pagerank": 0.431417,
+    "fan_in": 3,
+    "fan_out": 0
+   },
+   {
+    "file": "main.go",
+    "pagerank": 0.159784,
+    "fan_in": 1,
+    "fan_out": 1
+   },
+   {
+    "file": "manifest.go",
+    "pagerank": 0.159784,
+    "fan_in": 1,
+    "fan_out": 1
+   },
+   {
+    "file": "cli.go",
+    "pagerank": 0.124507,
+    "fan_in": 0,
+    "fan_out": 3
+   },
+   {
+    "file": "types.go",
+    "pagerank": 0.124507,
+    "fan_in": 0,
+    "fan_out": 0
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "cli.go",
+   "main.go",
+   "types.go",
+   "helpers.go"
+  ],
+  "target_symbols": [
+   "parseArgs",
+   "nextArg",
+   "run",
+   "atomicWriteFile",
+   "parentDirExists",
+   "fileDigest",
+   "sha256Hex",
+   "buildManifest",
+   "buildSummarySchema",
+   "classifySummaryType",
+   "summaryDescriptor",
+   "writeSummarySchema",
+   "writeSummarySchemaDigest",
+   "writeSummarySchemaIndex"
+  ],
+  "behavior_constraints": [
+   "Add four new optional flags: --summary-schema-out <path>, --summary-schema-digest <path>, --summary-schema-strict, --summary-schema-index <path>",
+   "When all four new flags are absent, every existing output (--output, --rejects, --state-out, --audit-log, --audit-log-digest, --out-parquet-manifest, --manifest-signature) remains byte-for-byte unchanged; no runtime-derived field is added to any existing output",
+   "Empty value for --summary-schema-out (or --summary-schema-digest/--summary-schema-index) is a usage error: exit code 2, no output files created, stderr 'ingest: --summary-schema-out: value must be non-empty' (parse-time check)",
+   "Parent directory of --summary-schema-out path must already exist; otherwise exit 2, no output files created, stderr 'ingest --summary-schema-out parent directory does not exist'",
+   "Parent directory of --summary-schema-digest path must already exist; otherwise exit 2, no output files created, stderr 'ingest --summary-schema-digest parent directory does not exist'",
+   "--summary-schema-digest without --summary-schema-out is an error: exit 2, no output files created, stderr 'ingest: --summary-schema-digest requires --summary-schema-out'",
+   "Validation order: empty-value check at parse time; parent-directory-exists and cross-flag dependency checks run before any output file is written",
+   "Schema sidecar is written after every other output (except optional digest sidecar) including after --output, derived deterministically from the bytes just written to --output",
+   "Schema sidecar is pretty-printed JSON with 2-space indentation and a trailing newline, written atomically via .tmp+rename (same discipline as --out-parquet-manifest)",
+   "Top-level keys of schema sidecar appear in exact order: schema_version, summary_schema, ingest_id, run_index, field_summary, strict_mode"
+  ],
+  "affected_prior": [
+   "parseArgs (rounds 5/6/7)",
+   "run / ingest main flow",
+   "buildManifest / writeManifest pattern (round 5)",
+   "summary --output writing logic"
+  ],
+  "summary": "This round adds optional schema-sidecar support to eventq ingest via four new flags (--summary-schema-out, --summary-schema-digest, --summary-schema-strict, --summary-schema-index) that emit deterministic read-only derivations of the just-written --output summary JSON, without altering any existing output when the flags are absent."
+ },
+ "instruction_head": "# Summary Schema Sidecars\n\nAdd optional schema-sidecar support to `eventq ingest`. The new\n`--summary-schema-out <path>` flag writes a sidecar describing the actual\ncurrent-run shape of the `--output` summary JSON. The companion\n`--summary-schema-digest <path>` flag writes a content-addressed digest for\nthat schema sidecar. `--summary-schema-strict` tightens only the schema\nsidecar derivation rules, and `--summary-schema-index <path>` writes a\nseparate index over the derived schema.\n\nThese sidec"
+}

@@ -1,0 +1,121 @@
+{
+ "round": 7,
+ "root": "/app",
+ "graph": {
+  "n_files": 13,
+  "n_edges": 52,
+  "delta": {
+   "files_added": [
+    "internal/server/ratelimit.go"
+   ],
+   "files_removed": [],
+   "edges_added": [
+    [
+     "internal/server/ratelimit.go",
+     "internal/audit/audit.go"
+    ],
+    [
+     "internal/server/ratelimit.go",
+     "internal/server/handlers.go"
+    ],
+    [
+     "internal/server/router.go",
+     "internal/server/ratelimit.go"
+    ],
+    [
+     "main.go",
+     "internal/server/ratelimit.go"
+    ]
+   ],
+   "edges_removed": []
+  },
+  "top10": [
+   {
+    "file": "internal/store/store.go",
+    "pagerank": 0.248141,
+    "fan_in": 8,
+    "fan_out": 7
+   },
+   {
+    "file": "internal/registry/registry.go",
+    "pagerank": 0.096169,
+    "fan_in": 6,
+    "fan_out": 2
+   },
+   {
+    "file": "internal/audit/audit.go",
+    "pagerank": 0.091217,
+    "fan_in": 6,
+    "fan_out": 1
+   },
+   {
+    "file": "internal/registry/validate.go",
+    "pagerank": 0.090682,
+    "fan_in": 4,
+    "fan_out": 0
+   },
+   {
+    "file": "internal/server/handlers.go",
+    "pagerank": 0.083346,
+    "fan_in": 5,
+    "fan_out": 9
+   },
+   {
+    "file": "internal/inference/inference.go",
+    "pagerank": 0.074937,
+    "fan_in": 5,
+    "fan_out": 3
+   },
+   {
+    "file": "internal/metrics/metrics.go",
+    "pagerank": 0.074937,
+    "fan_in": 5,
+    "fan_out": 1
+   },
+   {
+    "file": "internal/auth/auth.go",
+    "pagerank": 0.066823,
+    "fan_in": 4,
+    "fan_out": 7
+   },
+   {
+    "file": "internal/webhooks/webhooks.go",
+    "pagerank": 0.066823,
+    "fan_in": 4,
+    "fan_out": 7
+   },
+   {
+    "file": "internal/server/ratelimit.go",
+    "pagerank": 0.038306,
+    "fan_in": 2,
+    "fan_out": 2
+   }
+  ]
+ },
+ "entities": {
+  "source": "llm",
+  "target_files": [
+   "internal/webhooks/webhooks.go",
+   "internal/server/handlers.go"
+  ],
+  "target_symbols": [
+   "RegisterWebhook",
+   "webhooks.Register",
+   "ValidateWebhookURL"
+  ],
+  "behavior_constraints": [
+   "Reject webhook URLs whose scheme is not http or https with HTTP 400 JSON error.",
+   "Reject webhook URLs whose hostname is localhost or 127.0.0.1 with HTTP 400 JSON error.",
+   "Reject webhook URLs that resolve to or contain IPs in 127.0.0.0/8, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, or 169.254.0.0/16 with HTTP 400 JSON error.",
+   "Reject dotted-IP webhook URLs that fall within private/internal ranges with HTTP 400 JSON error.",
+   "Return HTTP 400 with a JSON error body describing the rejection reason.",
+   "Continue to accept and fire webhooks for valid external URLs without breaking existing webhook behavior.",
+   "Use only Go standard library packages for URL and IP validation."
+  ],
+  "affected_prior": [
+   "webhook creation path from round 1: RegisterWebhook and webhooks.Register"
+  ],
+  "summary": "This round demands SSRF protection by validating webhook URLs at creation time, rejecting non-HTTP(S) schemes, localhost, and private/internal IP targets with HTTP 400 while preserving webhook delivery for valid external URLs."
+ },
+ "instruction_head": "## Security Review: Webhook URL Allows SSRF Against Internal Services\n\nThe webhook creation endpoint accepts an arbitrary URL from the user without meaningful validation. When a webhook fires, the server makes an HTTP request to the user-supplied URL from within the server's network context. An attacker can point the webhook URL at internal services (e.g., cloud metadata endpoints, internal admin panels, local databases) and exfiltrate data or perform actions as the gateway server. This is a Ser"
+}
